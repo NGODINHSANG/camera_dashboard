@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  backend:
+    image: camera-dashboard-backend:v1.1
+    container_name: camera-dashboard-backend
+    restart: unless-stopped
+    environment:
+      - PORT=8080
+      - DATABASE_PATH=/app/data/dashboard.db
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
+    volumes:
+      - ./data:/app/data
+      - ./recordings:/app/recordings
+      # Mount host directories for folder browser and recording
+      - /home:/mnt/home
+      - /opt:/mnt/opt
+      - /var:/mnt/var
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8080/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    image: camera-dashboard-frontend:v1.1
+    container_name: camera-dashboard-frontend
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=/api
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  # Main Nginx Reverse Proxy (ONLY exposed port)
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: camera-nginx-proxy
+    restart: unless-stopped
+    ports:
+      - "8081:80" # Router forward 54543 → 8081 (ONLY port exposed)
+    volumes:
+      - ./nginx/nginx-proxy.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+      - mediamtx
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MediaMTX (RTSP/HLS/WebRTC streaming server)
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: camera-mediamtx
+    restart: unless-stopped
+    ports:
+      - "1935:1935" # RTMP ingestion (Router: 54541 → 1935)
+    environment:
+      - MTX_PROTOCOLS=tcp
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  nginx-cache:
+    driver: local

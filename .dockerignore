@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+backend/vendor/
+
+# Build outputs
+dist/
+build/
+backend/server
+
+# Development files
+*.log
+*.local
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Docs
+*.md
+!README.md

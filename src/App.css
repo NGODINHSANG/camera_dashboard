@@ -1,0 +1,20 @@
+.app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    background: transparent;
+}
+
+.app-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.main-content {
+    flex: 1;
+    padding: var(--spacing-sm);
+    overflow: hidden;
+    display: flex;
+}

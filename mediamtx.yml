@@ -1,0 +1,67 @@
+# MediaMTX Configuration for Camera Dashboard
+
+logLevel: info
+logDestinations: [stdout]
+
+# API
+api: yes
+apiAddress: :9997
+
+# Metrics
+metrics: yes
+metricsAddress: :9998
+
+# HLS Server
+hls: yes
+hlsAddress: :8888
+hlsAllowOrigins: ['*']
+hlsVariant: lowLatency
+hlsSegmentCount: 7
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+
+# WebRTC Server
+webrtc: yes
+webrtcAddress: :8889
+webrtcAllowOrigins: ['*']
+webrtcAdditionalHosts: []
+# Disable TCP mux - use UDP only (comment out to avoid port conflict)
+# webrtcLocalTCPAddress: :8890
+
+# RTMP Server (để nhận stream từ cameras qua RTMP)
+rtmp: yes
+rtmpAddress: :1935
+
+# RTSP Server (để nhận stream từ cameras)
+rtsp: yes
+rtspAddress: :8554
+rtspTransports: [tcp]
+
+# Paths (Dynamic - accept all)
+paths:
+  # Tự động accept mọi stream path
+  # Camera sẽ push vào: rtsp://mediamtx:8554/camera_<id>
+  # Hoặc pull từ: rtsp://camera-ip:port/stream
+
+  all:
+    # Cho phép mọi nguồn publish
+    source: publisher
+    sourceOnDemand: no
+
+    # Record settings (optional)
+    record: no
+
+    # Publisher override settings
+    overridePublisher: yes
+
+# Example static paths (uncomment to use)
+# paths:
+#   camera_1:
+#     source: rtsp://192.168.1.100:554/stream1
+#     sourceProtocol: tcp
+#     sourceOnDemand: yes
+#
+#   camera_2:
+#     source: rtsp://192.168.1.101:554/stream
+#     sourceProtocol: tcp
+#     sourceOnDemand: yes

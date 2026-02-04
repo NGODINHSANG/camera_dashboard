@@ -1,0 +1,237 @@
+.recording-dialog {
+    max-width: 480px;
+}
+
+.recording-dialog .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 20px;
+}
+
+.recording-dialog .modal-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1a1a2e;
+}
+
+.recording-dialog .close-btn {
+    background: transparent;
+    border: none;
+    padding: 8px;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease;
+}
+
+.recording-dialog .close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.recording-dialog .close-btn svg {
+    width: 20px;
+    height: 20px;
+    color: var(--text-muted);
+}
+
+.recording-dialog .close-btn:hover svg {
+    color: var(--text-primary);
+}
+
+.camera-info-section {
+    background: var(--bg-primary);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+}
+
+.info-row:not(:last-child) {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.info-row .label {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.info-row .value {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.form-hint {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.filename-preview {
+    background: var(--bg-primary);
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--border-color);
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.85rem;
+    color: var(--accent-teal);
+    word-break: break-all;
+}
+
+/* Button container */
+.recording-dialog .modal-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+/* Base button style - cả 2 button giống nhau */
+.recording-dialog .modal-actions .btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.recording-dialog .modal-actions .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Nút Hủy khi hover */
+.recording-dialog .modal-actions .btn-secondary:hover {
+    background: var(--border-light);
+    border-color: var(--text-muted);
+}
+
+/* Nút Ghi hình khi hover */
+.recording-dialog .modal-actions .btn-record:hover {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border-color: transparent;
+    color: white;
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
+}
+
+.recording-dialog .modal-actions .btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* Recording indicator styles */
+.recording-active-btn {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+    animation: pulse-recording 1.5s infinite;
+}
+
+@keyframes pulse-recording {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    }
+
+    50% {
+        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+    }
+}
+
+/* Folder input group */
+.folder-input-group {
+    display: flex;
+    gap: 8px;
+}
+
+.folder-input-group .form-input {
+    flex: 1;
+}
+
+.btn-browse {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-browse:hover {
+    background: var(--border-light);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+}
+
+.btn-browse svg {
+    width: 18px;
+    height: 18px;
+    color: var(--accent-yellow);
+}
+
+/* Error message */
+.recording-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    background: rgba(255, 23, 68, 0.1);
+    border: 1px solid rgba(255, 23, 68, 0.3);
+    border-radius: var(--radius-md);
+    color: var(--status-offline);
+    font-size: 13px;
+}
+
+.recording-error svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+/* Button spinner */
+.btn-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.btn-record:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}

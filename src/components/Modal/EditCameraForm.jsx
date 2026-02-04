@@ -1,0 +1,117 @@
+import { useState } from 'react'
+
+function EditCameraForm({ camera, onSubmit, onCancel }) {
+    const [formData, setFormData] = useState({
+        name: camera?.name || '',
+        location: camera?.location || '',
+        streamUrl: camera?.streamUrl || '',
+        isRecording: camera?.isRecording ?? true,
+        aspectRatio: camera?.aspectRatio || 'auto',
+    })
+
+    const aspectOptions = [
+        { value: 'auto', label: 'Tự động' },
+        { value: '16:9', label: '16:9' },
+        { value: '4:3', label: '4:3' },
+        { value: '1:1', label: '1:1' },
+    ]
+
+    const handleChange = (e) => {
+        const { name, value, type, checked } = e.target
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value
+        }))
+    }
+
+    const handleSubmit = (e) => {
+        e.preventDefault()
+
+        if (!formData.name.trim() || !formData.streamUrl.trim()) {
+            alert('Vui lòng điền đầy đủ thông tin bắt buộc')
+            return
+        }
+
+        onSubmit({
+            ...camera,
+            ...formData,
+        })
+    }
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <div className="form-group">
+                <label className="form-label">
+                    Tên Camera <span style={{ color: 'var(--status-offline)' }}>*</span>
+                </label>
+                <input
+                    type="text"
+                    name="name"
+                    className="form-input"
+                    placeholder="VD: Camera 1"
+                    value={formData.name}
+                    onChange={handleChange}
+                    autoFocus
+                />
+            </div>
+
+            <div className="form-group">
+                <label className="form-label">Vị trí</label>
+                <input
+                    type="text"
+                    name="location"
+                    className="form-input"
+                    placeholder="VD: Khu xưởng A"
+                    value={formData.location}
+                    onChange={handleChange}
+                />
+            </div>
+
+            <div className="form-group">
+                <label className="form-label">
+                    URL Stream (HLS) <span style={{ color: 'var(--status-offline)' }}>*</span>
+                </label>
+                <input
+                    type="text"
+                    name="streamUrl"
+                    className="form-input"
+                    placeholder="http://example.com/stream/index.m3u8"
+                    value={formData.streamUrl}
+                    onChange={handleChange}
+                />
+            </div>
+
+            <div className="form-group">
+                <label className="form-label">Tỷ lệ khung hình</label>
+                <div className="aspect-ratio-options">
+                    {aspectOptions.map((option) => (
+                        <label key={option.value} className="aspect-ratio-option">
+                            <input
+                                type="radio"
+                                name="aspectRatio"
+                                value={option.value}
+                                checked={formData.aspectRatio === option.value}
+                                onChange={handleChange}
+                            />
+                            <span className="aspect-ratio-label">{option.label}</span>
+                        </label>
+                    ))}
+                </div>
+            </div>
+
+            <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={onCancel}>
+                    Hủy
+                </button>
+                <button type="submit" className="btn btn-primary">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
+                    </svg>
+                    Lưu thay đổi
+                </button>
+            </div>
+        </form>
+    )
+}
+
+export default EditCameraForm
