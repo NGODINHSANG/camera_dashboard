@@ -32,7 +32,9 @@ func (h *ProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projects, err := h.projectRepo.GetByUserID(claims.UserID)
+	// All users can view all projects (for surveillance dashboard)
+	// Edit/Delete permissions are checked separately in those handlers
+	projects, err := h.projectRepo.GetAll()
 	if err != nil {
 		response.InternalError(w, "Failed to fetch projects")
 		return
@@ -75,11 +77,8 @@ func (h *ProjectHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check ownership
-	if project.UserID != claims.UserID && claims.Role != "admin" {
-		response.Forbidden(w, "Access denied")
-		return
-	}
+	// All users can VIEW any project (surveillance dashboard)
+	// Edit/Delete permissions are checked in those handlers
 
 	// Load cameras
 	cameras, err := h.cameraRepo.GetByProjectID(project.ID)
@@ -96,6 +95,12 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserFromContext(r.Context())
 	if claims == nil {
 		response.Unauthorized(w, "Authentication required")
+		return
+	}
+
+	// Only admin can create projects
+	if claims.Role != "admin" {
+		response.Forbidden(w, "Only admin can create projects")
 		return
 	}
 
@@ -130,6 +135,12 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Only admin can update projects
+	if claims.Role != "admin" {
+		response.Forbidden(w, "Only admin can update projects")
+		return
+	}
+
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -137,7 +148,6 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check ownership
 	project, err := h.projectRepo.GetByID(id)
 	if err != nil {
 		if err == repository.ErrProjectNotFound {
@@ -145,11 +155,6 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		response.InternalError(w, "Failed to fetch project")
-		return
-	}
-
-	if project.UserID != claims.UserID && claims.Role != "admin" {
-		response.Forbidden(w, "Access denied")
 		return
 	}
 
@@ -180,6 +185,12 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Only admin can delete projects
+	if claims.Role != "admin" {
+		response.Forbidden(w, "Only admin can delete projects")
+		return
+	}
+
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -187,19 +198,13 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check ownership
-	project, err := h.projectRepo.GetByID(id)
+	_, err = h.projectRepo.GetByID(id)
 	if err != nil {
 		if err == repository.ErrProjectNotFound {
 			response.NotFound(w, "Project not found")
 			return
 		}
 		response.InternalError(w, "Failed to fetch project")
-		return
-	}
-
-	if project.UserID != claims.UserID && claims.Role != "admin" {
-		response.Forbidden(w, "Access denied")
 		return
 	}
 

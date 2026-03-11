@@ -7,20 +7,24 @@ import (
 )
 
 type Config struct {
-	Port         string
-	DatabasePath string
-	JWTSecret    string
-	CORSOrigins  string
+	Port           string
+	DatabasePath   string
+	JWTSecret      string
+	CORSOrigins    string
+	RecordingsPath string
+	HLSCachePath   string // Local disk path for HLS segments (avoids SMB reads)
 }
 
 func Load() *Config {
 	godotenv.Load()
 
 	return &Config{
-		Port:         getEnv("PORT", "8080"),
-		DatabasePath: getEnv("DATABASE_PATH", "./data/dashboard.db"),
-		JWTSecret:    getEnv("JWT_SECRET", "default-secret-key"),
-		CORSOrigins:  getEnv("CORS_ORIGINS", "http://localhost:5173"),
+		Port:           getEnv("PORT", "8080"),
+		DatabasePath:   getEnv("DATABASE_PATH", "./data/dashboard.db"),
+		JWTSecret:      getEnv("JWT_SECRET", "default-secret-key"),
+		CORSOrigins:    getEnv("CORS_ORIGINS", "http://localhost:5173"),
+		RecordingsPath: getEnv("RECORDINGS_PATH", "/app/recordings"),
+		HLSCachePath:   getEnv("HLS_CACHE_PATH", ""), // Empty = store next to video files
 	}
 }
 

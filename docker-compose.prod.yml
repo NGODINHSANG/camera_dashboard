@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   backend:
-    image: camera-dashboard-backend:v1.1
+    image: camera-dashboard-backend:v2.0
     container_name: camera-dashboard-backend
     restart: unless-stopped
     environment:
@@ -10,15 +10,20 @@ services:
       - DATABASE_PATH=/app/data/dashboard.db
       - JWT_SECRET=${JWT_SECRET:-change-this-secret}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
+      - MEDIAMTX_HOST=http://camera-nginx-proxy # Use nginx proxy for HLS streams
+      - HLS_CACHE_PATH=/app/hls-cache # Local disk for HLS segments (avoids SMB reads)
     volumes:
       - ./data:/app/data
-      - ./recordings:/app/recordings
+      - /mnt/win_recordings:/app/recordings # SMB mount - MP4 gốc trên Windows
+      - /mnt/hls-cache:/app/hls-cache # LOCAL disk - HLS segments cho playback
       # Mount host directories for folder browser and recording
       - /home:/mnt/home
       - /opt:/mnt/opt
       - /var:/mnt/var
     networks:
       - app-network
+    dns:
+      - 127.0.0.11 # Docker's embedded DNS server
     healthcheck:
       test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8080/api/health" ]
       interval: 30s
@@ -26,7 +31,7 @@ services:
       retries: 3
 
   frontend:
-    image: camera-dashboard-frontend:v1.1
+    image: camera-dashboard-frontend:v2.0
     container_name: camera-dashboard-frontend
     restart: unless-stopped
     environment:
@@ -45,10 +50,11 @@ services:
       - "8081:80" # Router forward 54543 → 8081 (ONLY port exposed)
     volumes:
       - ./nginx/nginx-proxy.conf:/etc/nginx/nginx.conf:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Access MediaMTX on host network
     depends_on:
       - frontend
       - backend
-      - mediamtx
     networks:
       - app-network
     healthcheck:

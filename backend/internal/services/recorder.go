@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -65,22 +66,35 @@ func sanitizeFilename(name string) string {
 func (r *RecorderService) StartRecording(cameraID int64, projectID int64, projectName, cameraName, streamURL, outputDir string) (*models.Recording, error) {
 	// Convert relative URL to absolute URL for FFmpeg
 	if strings.HasPrefix(streamURL, "/") {
-		// Relative URL - prepend MediaMTX base URL
-		// Use environment variable or default to local/docker
+		// Relative URL - prepend base URL
+		// Use nginx proxy instead of direct mediamtx connection (better network compatibility)
 		mediamtxHost := os.Getenv("MEDIAMTX_HOST")
 		if mediamtxHost == "" {
-			mediamtxHost = "http://camera-mediamtx:8888" // Docker default
+			mediamtxHost = "http://camera-nginx-proxy" // Go through nginx proxy
 		}
 
-		// Strip /hls/ prefix if present - nginx proxies /hls/ to MediaMTX
-		// but MediaMTX serves streams directly at /<stream_name>/
+		// Replace /hls/ with /hls/record/ for the nginx proxy
 		if strings.HasPrefix(streamURL, "/hls/") {
-			streamURL = strings.TrimPrefix(streamURL, "/hls")
+			streamURL = strings.Replace(streamURL, "/hls/", "/hls/record/", 1)
 		}
 
 		streamURL = mediamtxHost + streamURL
 		log.Printf("[Recorder] Converted relative URL to: %s", streamURL)
 	}
+
+	// Check if stream is accessible before starting
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(streamURL) // GET is safer than HEAD for m3u8 playlists
+	if err != nil {
+		log.Printf("[Recorder] Stream not accessible: %s - %v", streamURL, err)
+		return nil, fmt.Errorf("stream not accessible: %w", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[Recorder] Stream returned status %d: %s", resp.StatusCode, streamURL)
+		return nil, fmt.Errorf("stream not available (status %d)", resp.StatusCode)
+	}
+	log.Printf("[Recorder] Stream verified accessible: %s", streamURL)
 
 	// Ensure output directory exists
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
@@ -109,14 +123,23 @@ func (r *RecorderService) StartRecording(cameraID int64, projectID int64, projec
 	recordingID, _ := result.LastInsertId()
 
 	// Start FFmpeg process with stdin pipe for graceful stop
+	// Use frag_keyframe+empty_moov for fragmented MP4 - playable immediately while recording
 	cmd := exec.Command("ffmpeg",
+		"-loglevel", "warning",      // Show warnings and errors
+		"-timeout", "10000000",      // 10 second timeout for connection
+		"-reconnect", "1",           // Enable reconnect
+		"-reconnect_streamed", "1",
+		"-reconnect_delay_max", "5", // Max 5 seconds between reconnects
 		"-i", streamURL,
 		"-c", "copy",
 		"-bsf:a", "aac_adtstoasc",
-		"-movflags", "+faststart",
+		"-movflags", "frag_keyframe+empty_moov+default_base_moof",
 		"-y",
 		filePath,
 	)
+
+	// Capture stderr for debugging
+	cmd.Stderr = os.Stderr
 
 	// Create stdin pipe to send 'q' for graceful stop
 	stdin, err := cmd.StdinPipe()
@@ -197,17 +220,57 @@ func (r *RecorderService) StopRecording(recordingID int64) error {
 	r.mu.RUnlock()
 
 	if !exists {
-		return fmt.Errorf("recording not found or already stopped")
+		// Process already exited (FFmpeg source died, stream ended, etc.)
+		// Check if recording was already completed/saved in DB
+		var status models.RecordingStatus
+		err := r.db.Get(&status, "SELECT status FROM recordings WHERE id = ?", recordingID)
+		if err != nil {
+			return fmt.Errorf("recording not found")
+		}
+		if status == models.RecordingStatusCompleted {
+			log.Printf("[Recorder] Recording ID=%d already completed (process exited earlier)", recordingID)
+			return nil // Already saved successfully, return OK
+		}
+		if status == models.RecordingStatusFailed {
+			log.Printf("[Recorder] Recording ID=%d already failed (process crashed earlier)", recordingID)
+			return nil // Already handled, return OK so frontend can update UI
+		}
+		// Status is still "recording" but process is gone - mark as failed
+		r.db.Exec("UPDATE recordings SET status = ?, stopped_at = ? WHERE id = ?",
+			models.RecordingStatusFailed, time.Now(), recordingID)
+		return fmt.Errorf("recording process lost unexpectedly")
 	}
 
-	// Send 'q' to FFmpeg stdin for graceful shutdown (works on Windows)
+	// Send 'q' to FFmpeg stdin for graceful shutdown
 	log.Printf("[Recorder] Sending 'q' to stop recording ID=%d", recordingID)
 	_, err := proc.stdin.Write([]byte("q"))
 	if err != nil {
 		log.Printf("[Recorder] Failed to send 'q', force killing: %v", err)
 		proc.cmd.Process.Kill()
+		proc.stdin.Close()
+		return nil
 	}
 	proc.stdin.Close()
+
+	// Wait up to 10 seconds for FFmpeg to finalize the MP4 file
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < 50; i++ { // 50 * 200ms = 10 seconds
+			r.mu.RLock()
+			_, stillRunning := r.processes[recordingID]
+			r.mu.RUnlock()
+			if !stillRunning {
+				close(done)
+				return
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+		// Timeout - force kill
+		log.Printf("[Recorder] Recording ID=%d did not stop in 10s, force killing", recordingID)
+		proc.cmd.Process.Kill()
+		close(done)
+	}()
+	<-done
 
 	return nil
 }
@@ -228,17 +291,30 @@ func (r *RecorderService) GetRecording(recordingID int64) (*models.Recording, er
 	return &recording, nil
 }
 
-// GetRecordingsByCamera gets all recordings for a camera
-func (r *RecorderService) GetRecordingsByCamera(cameraID int64) ([]models.Recording, error) {
+// GetRecordingsByCamera gets recordings for a camera, optionally filtered by status
+func (r *RecorderService) GetRecordingsByCamera(cameraID int64, status string) ([]models.Recording, error) {
 	var recordings []models.Recording
-	err := r.db.Select(&recordings, `
-		SELECT r.*, c.name as camera_name, p.name as project_name
-		FROM recordings r
-		JOIN cameras c ON r.camera_id = c.id
-		JOIN projects p ON r.project_id = p.id
-		WHERE r.camera_id = ?
-		ORDER BY r.created_at DESC
-	`, cameraID)
+	var err error
+
+	if status != "" {
+		err = r.db.Select(&recordings, `
+			SELECT r.*, c.name as camera_name, p.name as project_name
+			FROM recordings r
+			JOIN cameras c ON r.camera_id = c.id
+			JOIN projects p ON r.project_id = p.id
+			WHERE r.camera_id = ? AND r.status = ?
+			ORDER BY r.created_at DESC
+		`, cameraID, status)
+	} else {
+		err = r.db.Select(&recordings, `
+			SELECT r.*, c.name as camera_name, p.name as project_name
+			FROM recordings r
+			JOIN cameras c ON r.camera_id = c.id
+			JOIN projects p ON r.project_id = p.id
+			WHERE r.camera_id = ?
+			ORDER BY r.created_at DESC
+		`, cameraID)
+	}
 	return recordings, err
 }
 

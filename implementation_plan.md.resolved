@@ -1,0 +1,157 @@
+# Tính năng Xem Lại Video Đã Ghi (Video Playback)
+
+Thêm tính năng cho phép người dùng xem lại các video đã record từ camera, bao gồm: duyệt danh sách recordings theo camera, phát lại video trực tiếp trên giao diện với video player đầy đủ chức năng.
+
+## Phân Tích Hiện Trạng
+
+**Đã có sẵn:**
+- Model [Recording](file:///e:/Dashboard/backend/internal/models/recording.go#13-30) trong DB với đầy đủ thông tin: `file_path`, `filename`, `status`, `file_size`, `started_at`, `stopped_at`
+- Backend service [GetRecordingsByCamera(cameraID)](file:///e:/Dashboard/backend/internal/services/recorder.go#231-244) - đã có nhưng **chưa có route/handler** và **chưa filter theo status**
+- API endpoint `GET /recordings/{id}/download` - serve file mp4 dưới dạng download
+- Frontend API client [recordings.js](file:///e:/Dashboard/src/api/recordings.js) với [getAll()](file:///e:/Dashboard/src/api/recordings.js#12-15), [getById()](file:///e:/Dashboard/src/api/recordings.js#20-23), [getDownloadUrl()](file:///e:/Dashboard/src/api/recordings.js#32-35)
+
+**Cần thêm:**
+1. Backend: API endpoint streaming video (HTTP Range support cho seek), endpoint lấy recordings theo camera
+2. Frontend: UI component để duyệt và phát lại video
+
+## Proposed Changes
+
+### Backend - API Endpoints
+
+#### [MODIFY] [recordings.go](file:///e:/Dashboard/backend/internal/handlers/recordings.go)
+
+Thêm 2 handler mới:
+
+1. **`StreamRecording`** - Endpoint phát video streaming có hỗ trợ HTTP Range requests (cho phép seek/tua):
+   - Route: `GET /recordings/{id}/stream`
+   - Response: Dùng `http.ServeFile()` sẽ tự động xử lý Range requests
+   - Content-Type: `video/mp4` (không có `Content-Disposition: attachment` như download)
+
+2. **`GetCameraRecordings`** - Endpoint lấy tất cả recordings đã hoàn thành của 1 camera:
+   - Route: `GET /recordings/camera/{cameraId}/list`
+   - Chỉ trả về recordings có status = `completed`
+   - Sắp xếp theo thời gian mới nhất
+   - **Lưu ý**: Dùng `/list` để tránh conflict với route `/camera/{cameraId}/status` đã tồn tại
+
+#### [MODIFY] [router.go](file:///e:/Dashboard/backend/internal/router/router.go)
+
+Thêm 2 routes mới vào group `/api/recordings`:
+```go
+r.Get("/{id}/stream", recordingHandler.StreamRecording)
+r.Get("/camera/{cameraId}/list", recordingHandler.GetCameraRecordings)
+```
+
+#### [MODIFY] [recorder.go](file:///e:/Dashboard/backend/internal/services/recorder.go)
+
+**Lưu ý**: Method `GetRecordingsByCamera(cameraID)` đã tồn tại (line 231-243) nhưng trả về tất cả recordings.
+
+Có 2 cách triển khai:
+- **Cách 1 (Khuyến nghị)**: Sửa method hiện tại thành `GetRecordingsByCamera(cameraID, status string)` - linh hoạt hơn, có thể filter theo status bất kỳ
+- **Cách 2**: Thêm method mới `GetCompletedRecordingsByCamera(cameraID)` - đơn giản hơn nhưng ít linh hoạt
+
+---
+
+### Frontend - API Client
+
+#### [MODIFY] [recordings.js](file:///e:/Dashboard/src/api/recordings.js)
+
+Thêm:
+- `getByCamera(cameraId)` - gọi `GET /recordings/camera/{cameraId}/list`
+- `getStreamUrl(id)` - trả về URL streaming `{baseURL}/recordings/{id}/stream`
+
+---
+
+### Frontend - Video Player Component
+
+#### [NEW] [VideoPlayer.jsx](file:///e:/Dashboard/src/components/Modal/VideoPlayer.jsx)
+
+Component video player toàn màn hình trong modal:
+- Sử dụng HTML5 `<video>` element native
+- Controls: play/pause, seek bar, volume, tốc độ phát (0.5x, 1x, 1.5x, 2x), fullscreen
+- Hiển thị thông tin: tên camera, tên dự án, thời gian ghi, dung lượng
+- Nút tải xuống video
+- Responsive design, dark theme phù hợp giao diện hiện tại
+
+#### [NEW] [VideoPlayer.css](file:///e:/Dashboard/src/components/Modal/VideoPlayer.css)
+
+Styling cho video player - dark theme, hiện đại.
+
+---
+
+### Frontend - Recordings List Component
+
+#### [NEW] [RecordingsPanel.jsx](file:///e:/Dashboard/src/components/Modal/RecordingsPanel.jsx)
+
+Panel hiển thị danh sách recordings của camera đã chọn:
+- Hiển thị trong Modal khi user click nút "Xem lại" trên camera
+- Danh sách recordings với thông tin: tên file, ngày ghi, thời lượng, dung lượng
+- Click vào recording → mở VideoPlayer để phát
+- Nút xóa recording (chỉ admin)
+- Nút tải xuống
+- Empty state khi chưa có recordings
+
+#### [NEW] [RecordingsPanel.css](file:///e:/Dashboard/src/components/Modal/RecordingsPanel.css)
+
+Styling cho recordings panel.
+
+---
+
+### Frontend - Tích hợp vào giao diện
+
+#### [MODIFY] [CameraGrid.jsx](file:///e:/Dashboard/src/components/CameraGrid/CameraGrid.jsx)
+
+- Thêm state quản lý modal xem recordings
+- Truyền callback `onViewRecordings` xuống `CameraFrame`
+
+#### [MODIFY] [CameraFrame.jsx](file:///e:/Dashboard/src/components/CameraFrame/CameraFrame.jsx)
+
+- Thêm nút "📼 Xem lại" (icon play-list/video-library) trên mỗi camera frame
+- Click nút → trigger `onViewRecordings(camera)`
+
+#### [MODIFY] [App.jsx](file:///e:/Dashboard/src/App.jsx)
+
+- Import `RecordingsPanel` và `VideoPlayer`
+- Thêm state và modal cho recordings panel + video player
+
+---
+
+## Luồng Sử Dụng
+
+```mermaid
+flowchart TD
+    A[Người dùng nhìn CameraGrid] --> B[Click nút 'Xem lại' trên camera]
+    B --> C[Mở RecordingsPanel Modal]
+    C --> D[Hiển thị danh sách recordings của camera]
+    D --> E{Chọn hành động}
+    E -->|Click vào recording| F[Mở VideoPlayer Modal]
+    E -->|Click tải xuống| G[Download file mp4]
+    E -->|Click xóa| H[Xóa recording]
+    F --> I[Phát video với đầy đủ controls]
+```
+
+## Verification Plan
+
+### Automated Tests
+- Không có test framework hiện tại trong project → sẽ không thêm automated tests
+
+### Manual Verification
+
+> [!IMPORTANT]
+> Do backend chạy trên server Ubuntu với Docker, việc test đầy đủ cần deploy. Tôi đề xuất test local frontend trước, sau đó bạn deploy và test trên server.
+
+1. **Test Backend API** (sau khi deploy):
+   - `GET /api/recordings/camera/{cameraId}/list` → trả về list recordings đã completed
+   - `GET /api/recordings/{id}/stream` → phát video trong browser (hỗ trợ seek/tua)
+   
+2. **Test Frontend UI** (dùng browser tool):
+   - Mở dashboard → click vào nút "Xem lại" trên camera → verify modal hiện ra
+   - Verify danh sách recordings load đúng
+   - Click recording → verify video player mở và phát được
+   - Test controls: play, pause, seek, volume, speed
+   - Test nút download
+   - Test responsive trên mobile
+
+3. **Bạn test thực tế trên server:**
+   - Rebuild docker images và deploy
+   - Verify video streaming hoạt động mượt
+   - Verify seek/tua video hoạt động

@@ -2,7 +2,148 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import Hls from 'hls.js'
 import './CameraFrame.css'
 
-function CameraFrame({ camera, onStatusChange, onClick, isFullscreen, onEdit, onDelete, isAdmin = false, isRecordingActive = false, onRecordClick }) {
+// Sub-component for HLS playback (uses same HLS.js as live streaming)
+// Bandwidth optimization: small buffer = only download what's being watched
+function PlaybackHLS({ hlsUrl, onEnded, onError, loop = true }) {
+    const videoRef = useRef(null)
+    const hlsRef = useRef(null)
+    const [isLoading, setIsLoading] = useState(true)
+    const [error, setError] = useState(null)
+
+    useEffect(() => {
+        const video = videoRef.current
+        if (!video || !hlsUrl) return
+
+        setIsLoading(true)
+        setError(null)
+
+        if (Hls.isSupported()) {
+            const hls = new Hls({
+                // Giảm buffer = giảm upload burst, tiết kiệm băng thông WAN
+                maxBufferLength: 10,        // Buffer 10 giây
+                maxMaxBufferLength: 20,     // Max 20 giây khi seeking
+                maxBufferSize: 15 * 1000 * 1000, // Max 15MB buffer
+                maxBufferHole: 0.5,
+                // QUAN TRỌNG: Tăng timeout để chờ segment tải xong qua rate limit
+                // Không timeout sớm → không retry → không spam router
+                fragLoadingTimeOut: 30000,  // 30 giây (đủ cho segment 3MB ở 768KB/s)
+                manifestLoadingTimeOut: 15000,
+                levelLoadingTimeOut: 15000,
+                // Giảm retry để tránh bão request khi mạng chậm
+                manifestLoadingMaxRetry: 2,
+                manifestLoadingRetryDelay: 2000,
+                levelLoadingMaxRetry: 2,
+                fragLoadingMaxRetry: 2,
+                fragLoadingRetryDelay: 3000,
+            })
+
+            hls.loadSource(hlsUrl)
+            hls.attachMedia(video)
+
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                console.log('[PlaybackHLS] Manifest parsed, starting playback')
+                setIsLoading(false)
+                video.play().catch(() => { })
+            })
+
+            hls.on(Hls.Events.FRAG_LOADED, () => {
+                setIsLoading(false)
+            })
+
+            hls.on(Hls.Events.ERROR, (_, data) => {
+                console.error('[PlaybackHLS] Error:', data.type, data.details, data.fatal)
+                if (data.fatal) {
+                    setIsLoading(false)
+                    switch (data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            setError('Lỗi mạng khi tải video')
+                            // Try to recover
+                            hls.startLoad()
+                            break
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            setError('Lỗi media')
+                            hls.recoverMediaError()
+                            break
+                        default:
+                            setError('Không thể phát video')
+                            onError?.()
+                            break
+                    }
+                }
+            })
+
+            hlsRef.current = hls
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = hlsUrl
+            video.onloadeddata = () => setIsLoading(false)
+            video.onerror = () => {
+                setIsLoading(false)
+                setError('Không thể phát video')
+            }
+        }
+
+        // Handle video ended - for loop and playlist support
+        const handleEnded = () => {
+            if (loop) {
+                // Loop single video: HLS segments already cached, seek to start
+                video.currentTime = 0
+                video.play().catch(() => { })
+            } else if (onEnded) {
+                // Playlist mode: notify parent to play next
+                onEnded()
+            }
+        }
+        video.addEventListener('ended', handleEnded)
+
+        return () => {
+            video.removeEventListener('ended', handleEnded)
+            if (hlsRef.current) {
+                hlsRef.current.destroy()
+                hlsRef.current = null
+            }
+        }
+    }, [hlsUrl, onEnded, onError, loop])
+
+    return (
+        <div className="playback-container">
+            <video
+                ref={videoRef}
+                controls
+                playsInline
+                className="stream-video visible playback-video"
+            />
+            {isLoading && (
+                <div className="playback-loading">
+                    <div className="loading-spinner"></div>
+                    <span>Đang tải video...</span>
+                </div>
+            )}
+            {error && (
+                <div className="playback-error">
+                    <span>{error}</span>
+                </div>
+            )}
+        </div>
+    )
+}
+
+function CameraFrame({
+    camera,
+    onStatusChange,
+    onClick,
+    isFullscreen,
+    onEdit,
+    onDelete,
+    isAdmin = false,
+    isRecordingActive = false,
+    onRecordClick,
+    onViewRecordings,
+    // Playback mode props
+    playbackRecording = null,  // { name, path, streamUrl, size, modTime }
+    onExitPlayback = null,
+    onVideoEnded = null,       // Called when playback video ends
+    playlistInfo = null        // { playlist: [...], currentIndex: 0 }
+}) {
     const { id, name, location, isRecording, streamUrl, aspectRatio = 'auto' } = camera
     const videoRef = useRef(null)
     const hlsRef = useRef(null)
@@ -12,8 +153,18 @@ function CameraFrame({ camera, onStatusChange, onClick, isFullscreen, onEdit, on
     const [isConnected, setIsConnected] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [errorMsg, setErrorMsg] = useState('')
+    // Lazy loading: only load stream when activated (fullscreen or user clicks)
+
 
     const RETRY_INTERVAL = 5000
+    const isPlaybackMode = !!playbackRecording
+
+    // Debug playback
+    useEffect(() => {
+        if (playbackRecording) {
+            console.log('CameraFrame received playbackRecording:', playbackRecording)
+        }
+    }, [playbackRecording])
 
     const isWebRTCUrl = (url) => url && url.includes('/webrtc/') && url.includes('/whep')
 
@@ -97,7 +248,19 @@ function CameraFrame({ camera, onStatusChange, onClick, isFullscreen, onEdit, on
             return
         }
 
-        console.log(`[${name}] Connecting to:`, streamUrl)
+        // Swap HLS URL path based on view mode:
+        // Grid: /hls/grid/<stream> (rate limited to ~1Mbps)
+        // Fullscreen: /hls/full/<stream> (rate limited to ~6Mbps)
+        let effectiveUrl = streamUrl
+        if (streamUrl.includes('/hls/')) {
+            if (isFullscreen) {
+                effectiveUrl = streamUrl.replace('/hls/', '/hls/full/')
+            } else {
+                effectiveUrl = streamUrl.replace('/hls/', '/hls/grid/')
+            }
+        }
+
+        console.log(`[${name}] Connecting to:`, effectiveUrl, isFullscreen ? '(fullscreen)' : '(grid)')
         setIsLoading(true)
         setErrorMsg('')
         destroyAll()
@@ -113,9 +276,10 @@ function CameraFrame({ camera, onStatusChange, onClick, isFullscreen, onEdit, on
                 debug: false,
                 enableWorker: true,
                 lowLatencyMode: true,
-                backBufferLength: 90,
-                maxBufferLength: 30,
-                maxMaxBufferLength: 60,
+                // Grid: small buffer = less bandwidth. Fullscreen: normal buffer
+                backBufferLength: isFullscreen ? 90 : 10,
+                maxBufferLength: isFullscreen ? 30 : 5,
+                maxMaxBufferLength: isFullscreen ? 60 : 10,
                 startLevel: -1,
                 manifestLoadingMaxRetry: 6,
                 manifestLoadingRetryDelay: 1000,
@@ -125,7 +289,7 @@ function CameraFrame({ camera, onStatusChange, onClick, isFullscreen, onEdit, on
                 fragLoadingRetryDelay: 1000,
             })
 
-            hls.loadSource(streamUrl)
+            hls.loadSource(effectiveUrl)
             hls.attachMedia(video)
 
             hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
@@ -190,9 +354,17 @@ function CameraFrame({ camera, onStatusChange, onClick, isFullscreen, onEdit, on
             setErrorMsg('Trình duyệt không hỗ trợ HLS')
             setIsLoading(false)
         }
-    }, [streamUrl, id, name, onStatusChange, destroyAll, isConnected, connectWebRTC])
+    }, [streamUrl, id, name, onStatusChange, destroyAll, isConnected, connectWebRTC, isFullscreen])
 
     useEffect(() => {
+        // Don't connect live stream if in playback mode
+        if (isPlaybackMode) {
+            destroyAll()
+            setIsConnected(false)
+            setIsLoading(false)
+            return
+        }
+
         if (streamUrl) {
             connectStream()
         } else {
@@ -201,7 +373,7 @@ function CameraFrame({ camera, onStatusChange, onClick, isFullscreen, onEdit, on
             destroyAll()
         }
         return () => destroyAll()
-    }, [streamUrl])
+    }, [streamUrl, isPlaybackMode, isFullscreen])
 
     useEffect(() => {
         const video = videoRef.current
@@ -217,7 +389,7 @@ function CameraFrame({ camera, onStatusChange, onClick, isFullscreen, onEdit, on
         return () => video.removeEventListener('playing', handlePlaying)
     }, [id, onStatusChange])
 
-    // Handle click - chỉ khi không ở fullscreen mode
+    // Handle click
     const handleClick = () => {
         if (!isFullscreen && onClick) {
             onClick()
@@ -232,7 +404,30 @@ function CameraFrame({ camera, onStatusChange, onClick, isFullscreen, onEdit, on
         >
             {/* Video Stream Area */}
             <div className="camera-stream">
-                {streamUrl ? (
+                {isPlaybackMode ? (
+                    /* PLAYBACK MODE - Use HLS for instant loading, fallback to MP4 */
+                    playbackRecording?.hlsUrl ? (
+                        <PlaybackHLS
+                            hlsUrl={playbackRecording.hlsUrl}
+                            loop={true}
+                        />
+                    ) : playbackRecording?.streamUrl ? (
+                        <video
+                            src={playbackRecording.streamUrl}
+                            autoPlay
+                            controls
+                            playsInline
+                            loop
+                            preload="metadata"
+                            className="stream-video visible playback-video"
+                        />
+                    ) : (
+                        <div className="stream-placeholder">
+                            <div className="no-signal">Không thể tải video</div>
+                        </div>
+                    )
+                ) : streamUrl ? (
+                    /* LIVE MODE - Stream activated */
                     <>
                         <video
                             ref={videoRef}
@@ -313,25 +508,56 @@ function CameraFrame({ camera, onStatusChange, onClick, isFullscreen, onEdit, on
             {/* Bottom Overlay */}
             <div className="camera-overlay-bottom">
                 <div className="camera-icons">
-                    {/* Nút Record/Stop */}
-                    <button
-                        className={`icon-btn record-btn ${isRecordingActive ? 'recording' : ''}`}
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            onRecordClick?.()
-                        }}
-                        title={isRecordingActive ? 'Dừng ghi hình' : 'Bắt đầu ghi hình'}
-                    >
-                        {isRecordingActive ? (
+                    {isPlaybackMode ? (
+                        /* Playback mode: show exit button */
+                        <button
+                            className="icon-btn live-btn"
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onExitPlayback?.()
+                            }}
+                            title="Quay lai xem truc tiep"
+                        >
                             <svg viewBox="0 0 24 24" fill="currentColor">
-                                <rect x="6" y="6" width="12" height="12" rx="2" />
+                                <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
                             </svg>
-                        ) : (
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <circle cx="12" cy="12" r="8" />
-                            </svg>
-                        )}
-                    </button>
+                            <span style={{ marginLeft: 4, fontSize: 12 }}>LIVE</span>
+                        </button>
+                    ) : (
+                        /* Live mode: show record and playback buttons */
+                        <>
+                            <button
+                                className={`icon-btn record-btn ${isRecordingActive ? 'recording' : ''}`}
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    onRecordClick?.()
+                                }}
+                                title={isRecordingActive ? 'Dừng ghi hình' : 'Bắt đầu ghi hình'}
+                            >
+                                {isRecordingActive ? (
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <rect x="6" y="6" width="12" height="12" rx="2" />
+                                    </svg>
+                                ) : (
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <circle cx="12" cy="12" r="8" />
+                                    </svg>
+                                )}
+                            </button>
+                            <button
+                                className="icon-btn playback-btn"
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    onViewRecordings?.()
+                                }}
+                                title="Xem lai ban ghi"
+                            >
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8 12.5v-9l6 4.5-6 4.5z" />
+                                </svg>
+                            </button>
+                        </>
+                    )}
                     <span className={`icon-btn wifi ${isConnected ? 'active' : ''}`} title={isConnected ? 'Đang kết nối' : 'Mất kết nối'}>
                         <svg viewBox="0 0 24 24" fill="currentColor">
                             <path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z" />
@@ -339,12 +565,23 @@ function CameraFrame({ camera, onStatusChange, onClick, isFullscreen, onEdit, on
                     </span>
                 </div>
                 <div className="camera-status">
-                    {isRecordingActive && (
+                    {isPlaybackMode ? (
+                        <span className="rec-indicator playback-active">
+                            <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 12, height: 12, marginRight: 4 }}>
+                                <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8 12.5v-9l6 4.5-6 4.5z" />
+                            </svg>
+                            {playlistInfo ? (
+                                <span>PLAYBACK {playlistInfo.currentIndex + 1}/{playlistInfo.playlist.length}</span>
+                            ) : (
+                                <span>PLAYBACK</span>
+                            )}
+                        </span>
+                    ) : isRecordingActive ? (
                         <span className="rec-indicator recording-active">
                             <span className="rec-dot"></span>
                             REC
                         </span>
-                    )}
+                    ) : null}
                 </div>
             </div>
         </div>

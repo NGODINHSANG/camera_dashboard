@@ -4,8 +4,8 @@
 
 - **Server**: Ubuntu 20.04+ / Windows Server
 - **CPU**: 4 cores
-- **RAM**: 8 GB
-- **Storage**: 100 GB SSD
+- **RAM**: 16GB
+- **Storage**: 256GB SSD
 - **Docker**: 24.0+
 - **Docker Compose**: 2.20+
 

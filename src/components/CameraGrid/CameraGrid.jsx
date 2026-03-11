@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import CameraFrame from '../CameraFrame/CameraFrame'
-import RecordingDialog from '../Modal/RecordingDialog'
+import RecordingsPanel from '../Modal/RecordingsPanel'
 import { recordingsApi } from '../../api/recordings'
 import './CameraGrid.css'
 
@@ -19,8 +19,13 @@ function CameraGrid({
 }) {
     // Recording state
     const [recordingStates, setRecordingStates] = useState({}) // { cameraId: { isRecording, recordingId } }
-    const [showRecordingDialog, setShowRecordingDialog] = useState(false)
-    const [cameraToRecord, setCameraToRecord] = useState(null)
+    // Recordings panel state
+    const [showRecordingsPanel, setShowRecordingsPanel] = useState(false)
+    const [cameraForRecordings, setCameraForRecordings] = useState(null)
+    // Playback state: { cameraId: { name, path, streamUrl, size, modTime } }
+    const [playbackRecordings, setPlaybackRecordings] = useState({})
+    // Playlist state: { cameraId: { playlist: [...], currentIndex: 0 } }
+    const [playlistStates, setPlaylistStates] = useState({})
 
     // Load active recordings on mount
     useEffect(() => {
@@ -29,7 +34,9 @@ function CameraGrid({
 
     const loadActiveRecordings = async () => {
         try {
+            console.log('[CameraGrid] Loading active recordings...')
             const recordings = await recordingsApi.getActive()
+            console.log('[CameraGrid] Active recordings response:', recordings)
             const states = {}
             // recordings is array directly, not response.data
             if (Array.isArray(recordings)) {
@@ -37,42 +44,112 @@ function CameraGrid({
                     states[rec.cameraId] = { isRecording: true, recordingId: rec.id }
                 })
             }
+            console.log('[CameraGrid] Recording states:', states)
             setRecordingStates(states)
         } catch (err) {
             console.error('Failed to load active recordings:', err)
         }
     }
 
-    const handleRecordClick = useCallback((camera) => {
+    const handleRecordClick = useCallback(async (camera) => {
         const state = recordingStates[camera.id]
         if (state?.isRecording) {
             // Stop recording
             handleStopRecording(camera.id, state.recordingId)
         } else {
-            // Show dialog to start recording
-            setCameraToRecord({ ...camera, projectName: selectedProject?.name })
-            setShowRecordingDialog(true)
+            // Start recording directly (auto-saves to /recordings/<project>/<camera>)
+            try {
+                const response = await recordingsApi.start(camera.id)
+                const recording = response.data || response
+                setRecordingStates(prev => ({
+                    ...prev,
+                    [camera.id]: { isRecording: true, recordingId: recording.id }
+                }))
+            } catch (err) {
+                console.error('Failed to start recording:', err)
+                alert('Loi bat dau ghi hinh: ' + (err.response?.data?.error || err.message || 'Unknown error'))
+            }
         }
-    }, [recordingStates, selectedProject])
+    }, [recordingStates])
 
-    const handleStartRecording = async (outputDir) => {
-        if (!cameraToRecord) return
+    const handleViewRecordings = useCallback((camera) => {
+        setCameraForRecordings({ ...camera, projectName: selectedProject?.name })
+        setShowRecordingsPanel(true)
+    }, [selectedProject])
 
-        try {
-            const recording = await recordingsApi.start(cameraToRecord.id, outputDir)
-            setRecordingStates(prev => ({
-                ...prev,
-                [cameraToRecord.id]: { isRecording: true, recordingId: recording.id }
-            }))
-            setShowRecordingDialog(false)
-            setCameraToRecord(null)
-        } catch (err) {
-            console.error('Failed to start recording:', err)
-            alert('Lỗi bắt đầu ghi hình: ' + (err.message || 'Unknown error'))
-        }
-    }
+    // Handle playing a recording in the camera frame
+    const handlePlayRecording = useCallback((cameraId, recording) => {
+        console.log('handlePlayRecording called:', { cameraId, recording })
+        setPlaybackRecordings(prev => ({
+            ...prev,
+            [cameraId]: recording
+        }))
+        setShowRecordingsPanel(false)
+        setCameraForRecordings(null)
+    }, [])
+
+    // Handle playing a playlist (loop through videos)
+    const handlePlayPlaylist = useCallback((cameraId, playlist, startIndex = 0) => {
+        console.log('handlePlayPlaylist called:', { cameraId, playlistLength: playlist.length, startIndex })
+        if (!playlist || playlist.length === 0) return
+
+        // Set playlist state with starting index
+        setPlaylistStates(prev => ({
+            ...prev,
+            [cameraId]: { playlist, currentIndex: startIndex }
+        }))
+
+        // Start playing from selected video
+        setPlaybackRecordings(prev => ({
+            ...prev,
+            [cameraId]: playlist[startIndex]
+        }))
+
+        setShowRecordingsPanel(false)
+        setCameraForRecordings(null)
+    }, [])
+
+    // Handle video ended - play next in playlist
+    const handleVideoEnded = useCallback((cameraId) => {
+        const state = playlistStates[cameraId]
+        if (!state || !state.playlist || state.playlist.length === 0) return
+
+        const nextIndex = (state.currentIndex + 1) % state.playlist.length
+        console.log('Video ended, playing next:', { cameraId, nextIndex, total: state.playlist.length })
+
+        // Update playlist index
+        setPlaylistStates(prev => ({
+            ...prev,
+            [cameraId]: { ...prev[cameraId], currentIndex: nextIndex }
+        }))
+
+        // Play next video
+        setPlaybackRecordings(prev => ({
+            ...prev,
+            [cameraId]: state.playlist[nextIndex]
+        }))
+    }, [playlistStates])
+
+    // Handle exiting playback mode
+    const handleExitPlayback = useCallback((cameraId) => {
+        setPlaybackRecordings(prev => {
+            const newState = { ...prev }
+            delete newState[cameraId]
+            return newState
+        })
+        // Clear playlist state
+        setPlaylistStates(prev => {
+            const newState = { ...prev }
+            delete newState[cameraId]
+            return newState
+        })
+    }, [])
 
     const handleStopRecording = async (cameraId, recordingId) => {
+        // Log stack trace to find who called this
+        console.log('[CameraGrid] handleStopRecording called:', { cameraId, recordingId })
+        console.trace('[CameraGrid] Stop recording stack trace')
+
         try {
             await recordingsApi.stop(recordingId)
             setRecordingStates(prev => {
@@ -95,18 +172,37 @@ function CameraGrid({
     // Nếu có camera được chọn, chỉ hiển thị camera đó ở chế độ fullscreen
     if (selectedCamera) {
         return (
-            <div className="camera-grid fullscreen">
-                <CameraFrame
-                    camera={selectedCamera}
-                    onStatusChange={onStatusChange}
-                    isFullscreen={true}
-                    onEdit={() => onEditCamera(selectedCamera)}
-                    onDelete={() => onDeleteCamera(selectedCamera)}
-                    isAdmin={isAdmin}
-                    isRecordingActive={recordingStates[selectedCamera.id]?.isRecording || false}
-                    onRecordClick={() => handleRecordClick(selectedCamera)}
-                />
-            </div>
+            <>
+                <div className="camera-grid fullscreen">
+                    <CameraFrame
+                        camera={selectedCamera}
+                        onStatusChange={onStatusChange}
+                        isFullscreen={true}
+                        onEdit={() => onEditCamera(selectedCamera)}
+                        onDelete={() => onDeleteCamera(selectedCamera)}
+                        isAdmin={isAdmin}
+                        isRecordingActive={recordingStates[selectedCamera.id]?.isRecording || false}
+                        onRecordClick={() => handleRecordClick(selectedCamera)}
+                        onViewRecordings={() => handleViewRecordings(selectedCamera)}
+                        playbackRecording={playbackRecordings[selectedCamera.id] || null}
+                        onExitPlayback={() => handleExitPlayback(selectedCamera.id)}
+                        onVideoEnded={() => handleVideoEnded(selectedCamera.id)}
+                        playlistInfo={playlistStates[selectedCamera.id] || null}
+                    />
+                </div>
+                {/* Recordings Panel */}
+                {showRecordingsPanel && cameraForRecordings && (
+                    <RecordingsPanel
+                        camera={cameraForRecordings}
+                        onClose={() => {
+                            setShowRecordingsPanel(false)
+                            setCameraForRecordings(null)
+                        }}
+                        onPlayRecording={(recording) => handlePlayRecording(cameraForRecordings.id, recording)}
+                        onPlayPlaylist={(playlist, startIndex) => handlePlayPlaylist(cameraForRecordings.id, playlist, startIndex)}
+                    />
+                )}
+            </>
         )
     }
 
@@ -128,6 +224,11 @@ function CameraGrid({
                         isAdmin={isAdmin}
                         isRecordingActive={recordingStates[camera.id]?.isRecording || false}
                         onRecordClick={() => handleRecordClick(camera)}
+                        onViewRecordings={() => handleViewRecordings(camera)}
+                        playbackRecording={playbackRecordings[camera.id] || null}
+                        onExitPlayback={() => handleExitPlayback(camera.id)}
+                        onVideoEnded={() => handleVideoEnded(camera.id)}
+                        playlistInfo={playlistStates[camera.id] || null}
                     />
                 ))}
                 {hasProject && cameras.length === 0 && (
@@ -145,15 +246,16 @@ function CameraGrid({
                 )}
             </div>
 
-            {/* Recording Dialog */}
-            {showRecordingDialog && cameraToRecord && (
-                <RecordingDialog
-                    camera={cameraToRecord}
-                    onStart={handleStartRecording}
-                    onCancel={() => {
-                        setShowRecordingDialog(false)
-                        setCameraToRecord(null)
+            {/* Recordings Panel */}
+            {showRecordingsPanel && cameraForRecordings && (
+                <RecordingsPanel
+                    camera={cameraForRecordings}
+                    onClose={() => {
+                        setShowRecordingsPanel(false)
+                        setCameraForRecordings(null)
                     }}
+                    onPlayRecording={(recording) => handlePlayRecording(cameraForRecordings.id, recording)}
+                    onPlayPlaylist={(playlist, startIndex) => handlePlayPlaylist(cameraForRecordings.id, playlist, startIndex)}
                 />
             )}
         </div>

@@ -2,6 +2,7 @@ package router
 
 import (
 	"net/http"
+	"time"
 
 	"camera-dashboard-backend/internal/config"
 	"camera-dashboard-backend/internal/handlers"
@@ -37,7 +38,14 @@ func Setup(db *sqlx.DB, cfg *config.Config) *chi.Mux {
 	projectHandler := handlers.NewProjectHandler(projectRepo, cameraRepo)
 	cameraHandler := handlers.NewCameraHandler(cameraRepo, projectRepo)
 	adminHandler := handlers.NewAdminHandler(userRepo, projectRepo, cameraRepo)
-	recordingHandler := handlers.NewRecordingHandler(db, recorderService)
+	recordingHandler := handlers.NewRecordingHandler(db, recorderService, cfg.RecordingsPath)
+
+	// Initialize HLS cache (local disk for segments, avoids SMB reads)
+	services.InitHLSCache(cfg.HLSCachePath, cfg.RecordingsPath)
+
+	// Start HLS converter worker (scans every 2 minutes)
+	hlsConverter := services.NewHLSConverter(cfg.RecordingsPath, db)
+	hlsConverter.StartWorker(2 * time.Minute)
 
 	// Routes
 	r.Route("/api", func(r chi.Router) {
@@ -46,6 +54,13 @@ func Setup(db *sqlx.DB, cfg *config.Config) *chi.Mux {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"status":"ok"}`))
 		})
+
+		// Public video streaming routes (no auth required for video element)
+		r.Get("/recordings/files/stream", recordingHandler.StreamVideoFile)
+		r.Get("/recordings/files/download", recordingHandler.DownloadVideoFile)
+		r.Get("/recordings/hls", recordingHandler.ServeHLSFile)
+		r.Get("/recordings/restream", recordingHandler.LiveRestream)
+
 		// Auth routes (public)
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/register", authHandler.Register)
@@ -90,7 +105,15 @@ func Setup(db *sqlx.DB, cfg *config.Config) *chi.Mux {
 				r.Post("/{id}/stop", recordingHandler.StopRecording)
 				r.Delete("/{id}", recordingHandler.DeleteRecording)
 				r.Get("/{id}/download", recordingHandler.DownloadRecording)
+				r.Get("/{id}/stream", recordingHandler.StreamRecording)
 				r.Get("/camera/{cameraId}/status", recordingHandler.GetCameraRecordingStatus)
+				r.Get("/camera/{cameraId}/list", recordingHandler.GetCameraRecordings)
+
+				// File-based recording routes (new)
+				r.Get("/files/{projectName}/{cameraName}", recordingHandler.ListCameraRecordingFiles)
+				r.Get("/files/stream", recordingHandler.StreamVideoFile)
+				r.Get("/files/download", recordingHandler.DownloadVideoFile)
+				r.Delete("/files/delete", recordingHandler.DeleteVideoFile)
 			})
 
 			// Admin routes

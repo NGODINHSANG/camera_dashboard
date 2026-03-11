@@ -6,7 +6,7 @@ echo === Building Docker Images ===
 
 REM Build frontend
 echo Building frontend image...
-docker build -t camera-dashboard-frontend:v1.1 .
+docker build -t camera-dashboard-frontend:v2.0 .
 if %errorlevel% neq 0 (
     echo Failed to build frontend!
     exit /b 1
@@ -14,7 +14,7 @@ if %errorlevel% neq 0 (
 
 REM Build backend
 echo Building backend image...
-docker build -t camera-dashboard-backend:v1.1 ./backend
+docker build -t camera-dashboard-backend:v2.0 ./backend
 if %errorlevel% neq 0 (
     echo Failed to build backend!
     exit /b 1
@@ -28,10 +28,10 @@ if not exist "deploy" mkdir deploy
 
 REM Export images
 echo Exporting frontend image...
-docker save camera-dashboard-frontend:v1.1 -o deploy/frontend.tar
+docker save camera-dashboard-frontend:v2.0 -o deploy/frontend.tar
 
 echo Exporting backend image...
-docker save camera-dashboard-backend:v1.1 -o deploy/backend.tar
+docker save camera-dashboard-backend:v2.0 -o deploy/backend.tar
 
 REM Copy configs for server
 copy docker-compose.prod.yml deploy\docker-compose.yml

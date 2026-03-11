@@ -55,13 +55,14 @@ func (h *CameraHandler) GetByProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check project access
-	_, err, status := h.checkProjectAccess(claims, projectID)
+	// All users can VIEW cameras (surveillance dashboard)
+	// Edit/Delete permissions are checked in those handlers
+
+	// Check project exists
+	_, err = h.projectRepo.GetByID(projectID)
 	if err != nil {
-		if status == http.StatusNotFound {
+		if err == repository.ErrProjectNotFound {
 			response.NotFound(w, "Project not found")
-		} else if status == http.StatusForbidden {
-			response.Forbidden(w, "Access denied")
 		} else {
 			response.InternalError(w, "Failed to fetch project")
 		}
@@ -84,6 +85,12 @@ func (h *CameraHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Only admin can create cameras
+	if claims.Role != "admin" {
+		response.Forbidden(w, "Only admin can create cameras")
+		return
+	}
+
 	projectIDStr := chi.URLParam(r, "projectId")
 	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil {
@@ -91,13 +98,11 @@ func (h *CameraHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check project access
-	_, err, status := h.checkProjectAccess(claims, projectID)
+	// Check project exists
+	_, err = h.projectRepo.GetByID(projectID)
 	if err != nil {
-		if status == http.StatusNotFound {
+		if err == repository.ErrProjectNotFound {
 			response.NotFound(w, "Project not found")
-		} else if status == http.StatusForbidden {
-			response.Forbidden(w, "Access denied")
 		} else {
 			response.InternalError(w, "Failed to fetch project")
 		}
@@ -142,6 +147,12 @@ func (h *CameraHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Only admin can update cameras
+	if claims.Role != "admin" {
+		response.Forbidden(w, "Only admin can update cameras")
+		return
+	}
+
 	projectIDStr := chi.URLParam(r, "projectId")
 	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil {
@@ -156,13 +167,11 @@ func (h *CameraHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check project access
-	_, err, status := h.checkProjectAccess(claims, projectID)
+	// Check project exists
+	_, err = h.projectRepo.GetByID(projectID)
 	if err != nil {
-		if status == http.StatusNotFound {
+		if err == repository.ErrProjectNotFound {
 			response.NotFound(w, "Project not found")
-		} else if status == http.StatusForbidden {
-			response.Forbidden(w, "Access denied")
 		} else {
 			response.InternalError(w, "Failed to fetch project")
 		}
@@ -212,6 +221,12 @@ func (h *CameraHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Only admin can delete cameras
+	if claims.Role != "admin" {
+		response.Forbidden(w, "Only admin can delete cameras")
+		return
+	}
+
 	projectIDStr := chi.URLParam(r, "projectId")
 	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil {
@@ -226,13 +241,11 @@ func (h *CameraHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check project access
-	_, err, status := h.checkProjectAccess(claims, projectID)
+	// Check project exists
+	_, err = h.projectRepo.GetByID(projectID)
 	if err != nil {
-		if status == http.StatusNotFound {
+		if err == repository.ErrProjectNotFound {
 			response.NotFound(w, "Project not found")
-		} else if status == http.StatusForbidden {
-			response.Forbidden(w, "Access denied")
 		} else {
 			response.InternalError(w, "Failed to fetch project")
 		}
