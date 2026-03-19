@@ -362,7 +362,7 @@ func (r *RecorderService) DeleteRecording(recordingID int64) error {
 func (r *RecorderService) IsRecording(cameraID int64) (bool, int64) {
 	var recordingID int64
 	err := r.db.Get(&recordingID, `
-		SELECT id FROM recordings 
+		SELECT id FROM recordings
 		WHERE camera_id = ? AND status = ?
 	`, cameraID, models.RecordingStatusRecording)
 	if err != nil {
@@ -370,3 +370,4 @@ func (r *RecorderService) IsRecording(cameraID int64) (bool, int64) {
 	}
 	return true, recordingID
 }
+

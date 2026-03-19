@@ -61,5 +61,9 @@ func RunMigrations(db *sqlx.DB) error {
 		}
 	}
 
+	// Add auto_record column to cameras (SQLite ALTER TABLE)
+	// This will fail silently if column already exists
+	db.Exec(`ALTER TABLE cameras ADD COLUMN auto_record BOOLEAN DEFAULT 0`)
+
 	return nil
 }

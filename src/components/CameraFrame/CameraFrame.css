@@ -82,6 +82,75 @@
     padding: var(--spacing-md);
 }
 
+/* No Signal Container - When no live stream */
+.no-signal-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    text-align: center;
+}
+
+.no-signal-icon {
+    width: 48px;
+    height: 48px;
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+.no-signal-text {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.no-signal-playback-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: rgba(0, 188, 212, 0.15);
+    border: 1px solid var(--accent-blue);
+    border-radius: var(--radius-sm);
+    color: var(--accent-blue);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.no-signal-playback-btn:hover {
+    background: rgba(0, 188, 212, 0.3);
+    transform: scale(1.02);
+}
+
+.no-signal-playback-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Fullscreen mode - larger no-signal elements */
+.camera-frame.fullscreen .no-signal-icon {
+    width: 64px;
+    height: 64px;
+}
+
+.camera-frame.fullscreen .no-signal-text {
+    font-size: 1.2rem;
+}
+
+.camera-frame.fullscreen .no-signal-playback-btn {
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-size: 1rem;
+}
+
+.camera-frame.fullscreen .no-signal-playback-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
 /* Loading Spinner */
 .stream-loading {
     position: absolute;

@@ -3,9 +3,11 @@
 logLevel: info
 logDestinations: [stdout]
 
-# API
+# API (no auth for internal use)
 api: yes
 apiAddress: :9997
+apiEncryption: no
+apiAllowOrigin: '*'
 
 # Metrics
 metrics: yes
@@ -14,7 +16,7 @@ metricsAddress: :9998
 # HLS Server
 hls: yes
 hlsAddress: :8888
-hlsAllowOrigins: ['*']
+hlsAllowOrigin: '*'
 hlsVariant: lowLatency
 hlsSegmentCount: 20
 hlsSegmentDuration: 2s
@@ -23,8 +25,7 @@ hlsPartDuration: 200ms
 # WebRTC Server
 webrtc: yes
 webrtcAddress: :8889
-webrtcAllowOrigins: ['*']
-webrtcAdditionalHosts: []
+webrtcAllowOrigin: '*'
 # Disable TCP mux - use UDP only (comment out to avoid port conflict)
 # webrtcLocalTCPAddress: :8890
 
@@ -53,6 +54,19 @@ paths:
 
     # Publisher override settings
     overridePublisher: yes
+
+    # Auto-recording webhooks
+    # Khi có stream đẩy lên (publisher connects)
+    runOnReady: >
+      wget -q -O - --post-data='{"path":"$MTX_PATH"}'
+      --header='Content-Type: application/json'
+      http://camera-dashboard-backend:8080/api/internal/webhooks/stream-ready || true
+
+    # Khi stream ngắt kết nối (publisher disconnects)
+    runOnNotReady: >
+      wget -q -O - --post-data='{"path":"$MTX_PATH"}'
+      --header='Content-Type: application/json'
+      http://camera-dashboard-backend:8080/api/internal/webhooks/stream-not-ready || true
 
 # Example static paths (uncomment to use)
 # paths:

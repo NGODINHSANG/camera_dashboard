@@ -6,6 +6,7 @@ function EditCameraForm({ camera, onSubmit, onCancel }) {
         location: camera?.location || '',
         streamUrl: camera?.streamUrl || '',
         isRecording: camera?.isRecording ?? true,
+        autoRecord: camera?.autoRecord ?? false,
         aspectRatio: camera?.aspectRatio || 'auto',
     })
 
@@ -97,6 +98,19 @@ function EditCameraForm({ camera, onSubmit, onCancel }) {
                         </label>
                     ))}
                 </div>
+            </div>
+
+            <div className="form-group">
+                <label className="checkbox-label">
+                    <input
+                        type="checkbox"
+                        name="autoRecord"
+                        checked={formData.autoRecord}
+                        onChange={handleChange}
+                    />
+                    <span className="checkbox-text">Tự động ghi hình</span>
+                </label>
+                <p className="form-hint">Tự động ghi hình khi có tín hiệu stream (mỗi file 15 phút)</p>
             </div>
 
             <div className="modal-actions">

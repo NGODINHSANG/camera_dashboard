@@ -6,7 +6,7 @@ echo === Building Docker Images ===
 
 REM Build frontend
 echo Building frontend image...
-docker build -t camera-dashboard-frontend:v2.0 .
+docker build -t camera-dashboard-frontend:v2.1 .
 if %errorlevel% neq 0 (
     echo Failed to build frontend!
     exit /b 1
@@ -14,9 +14,17 @@ if %errorlevel% neq 0 (
 
 REM Build backend
 echo Building backend image...
-docker build -t camera-dashboard-backend:v2.0 ./backend
+docker build -t camera-dashboard-backend:v2.1 ./backend
 if %errorlevel% neq 0 (
     echo Failed to build backend!
+    exit /b 1
+)
+
+REM Build mediamtx (with wget for webhooks)
+echo Building mediamtx image...
+docker build -t camera-mediamtx:v2.1 ./mediamtx
+if %errorlevel% neq 0 (
+    echo Failed to build mediamtx!
     exit /b 1
 )
 
@@ -28,10 +36,13 @@ if not exist "deploy" mkdir deploy
 
 REM Export images
 echo Exporting frontend image...
-docker save camera-dashboard-frontend:v2.0 -o deploy/frontend.tar
+docker save camera-dashboard-frontend:v2.1 -o deploy/frontend.tar
 
 echo Exporting backend image...
-docker save camera-dashboard-backend:v2.0 -o deploy/backend.tar
+docker save camera-dashboard-backend:v2.1 -o deploy/backend.tar
+
+echo Exporting mediamtx image...
+docker save camera-mediamtx:v2.1 -o deploy/mediamtx.tar
 
 REM Copy configs for server
 copy docker-compose.prod.yml deploy\docker-compose.yml
@@ -69,6 +80,7 @@ echo.
 echo 4. Load images and run:
 echo    docker load -i frontend.tar
 echo    docker load -i backend.tar
+echo    docker load -i mediamtx.tar
 echo    docker-compose -f docker-compose.yml up -d
 echo.
 echo 5. Access: http://YOUR_PUBLIC_IP:54543

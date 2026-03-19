@@ -14,8 +14,10 @@ import (
 )
 
 type CameraHandler struct {
-	cameraRepo  *repository.CameraRepository
-	projectRepo *repository.ProjectRepository
+	cameraRepo          *repository.CameraRepository
+	projectRepo         *repository.ProjectRepository
+	onAutoRecordEnable  func(cameraID int64) // Callback when auto_record is enabled
+	onAutoRecordDisable func(cameraID int64) // Callback when auto_record is disabled
 }
 
 func NewCameraHandler(cameraRepo *repository.CameraRepository, projectRepo *repository.ProjectRepository) *CameraHandler {
@@ -23,6 +25,16 @@ func NewCameraHandler(cameraRepo *repository.CameraRepository, projectRepo *repo
 		cameraRepo:  cameraRepo,
 		projectRepo: projectRepo,
 	}
+}
+
+// SetAutoRecordCallback sets the callback function called when auto_record is enabled
+func (h *CameraHandler) SetAutoRecordCallback(callback func(cameraID int64)) {
+	h.onAutoRecordEnable = callback
+}
+
+// SetAutoRecordDisableCallback sets the callback function called when auto_record is disabled
+func (h *CameraHandler) SetAutoRecordDisableCallback(callback func(cameraID int64)) {
+	h.onAutoRecordDisable = callback
 }
 
 func (h *CameraHandler) checkProjectAccess(claims *middleware.Claims, projectID int64) (*models.Project, error, int) {
@@ -130,6 +142,7 @@ func (h *CameraHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Location:    req.Location,
 		StreamURL:   req.StreamURL,
 		IsRecording: req.IsRecording,
+		AutoRecord:  req.AutoRecord,
 	}
 
 	if err := h.cameraRepo.Create(camera); err != nil {
@@ -201,14 +214,29 @@ func (h *CameraHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if auto_record is being toggled
+	autoRecordJustEnabled := !camera.AutoRecord && req.AutoRecord
+	autoRecordJustDisabled := camera.AutoRecord && !req.AutoRecord
+
 	camera.Name = req.Name
 	camera.Location = req.Location
 	camera.StreamURL = req.StreamURL
 	camera.IsRecording = req.IsRecording
+	camera.AutoRecord = req.AutoRecord
 
 	if err := h.cameraRepo.Update(camera); err != nil {
 		response.InternalError(w, "Failed to update camera")
 		return
+	}
+
+	// If auto_record was just enabled, trigger stream check
+	if autoRecordJustEnabled && h.onAutoRecordEnable != nil {
+		go h.onAutoRecordEnable(cameraID)
+	}
+
+	// If auto_record was just disabled, stop recording
+	if autoRecordJustDisabled && h.onAutoRecordDisable != nil {
+		go h.onAutoRecordDisable(cameraID)
 	}
 
 	response.JSON(w, http.StatusOK, camera)

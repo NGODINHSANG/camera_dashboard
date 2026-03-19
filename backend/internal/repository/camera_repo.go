@@ -20,11 +20,11 @@ func NewCameraRepository(db *sqlx.DB) *CameraRepository {
 }
 
 func (r *CameraRepository) Create(camera *models.Camera) error {
-	query := `INSERT INTO cameras (project_id, name, location, stream_url, is_recording, created_at, updated_at)
-			  VALUES (?, ?, ?, ?, ?, ?, ?)`
+	query := `INSERT INTO cameras (project_id, name, location, stream_url, is_recording, auto_record, created_at, updated_at)
+			  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 
 	now := time.Now()
-	result, err := r.db.Exec(query, camera.ProjectID, camera.Name, camera.Location, camera.StreamURL, camera.IsRecording, now, now)
+	result, err := r.db.Exec(query, camera.ProjectID, camera.Name, camera.Location, camera.StreamURL, camera.IsRecording, camera.AutoRecord, now, now)
 	if err != nil {
 		return err
 	}
@@ -72,8 +72,8 @@ func (r *CameraRepository) GetByProjectID(projectID int64) ([]models.Camera, err
 }
 
 func (r *CameraRepository) Update(camera *models.Camera) error {
-	query := `UPDATE cameras SET name = ?, location = ?, stream_url = ?, is_recording = ?, updated_at = ? WHERE id = ?`
-	result, err := r.db.Exec(query, camera.Name, camera.Location, camera.StreamURL, camera.IsRecording, time.Now(), camera.ID)
+	query := `UPDATE cameras SET name = ?, location = ?, stream_url = ?, is_recording = ?, auto_record = ?, updated_at = ? WHERE id = ?`
+	result, err := r.db.Exec(query, camera.Name, camera.Location, camera.StreamURL, camera.IsRecording, camera.AutoRecord, time.Now(), camera.ID)
 	if err != nil {
 		return err
 	}

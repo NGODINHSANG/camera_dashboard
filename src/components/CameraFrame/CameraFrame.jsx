@@ -444,7 +444,26 @@ function CameraFrame({
                         )}
                         {!isConnected && !isLoading && (
                             <div className="stream-placeholder">
-                                <div className="no-signal">{errorMsg || 'Đang chờ tín hiệu...'}</div>
+                                <div className="no-signal-container">
+                                    <svg viewBox="0 0 24 24" fill="currentColor" className="no-signal-icon">
+                                        <path d="M21 6h-7.59l3.29-3.29L16 2l-4 4-4-4-.71.71L10.59 6H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 14H3V8h18v12zM9 10v8l7-4z" />
+                                    </svg>
+                                    <span className="no-signal-text">Chưa có kết nối live stream</span>
+                                    {onViewRecordings && (
+                                        <button
+                                            className="no-signal-playback-btn"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                onViewRecordings()
+                                            }}
+                                        >
+                                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8 12.5v-9l6 4.5-6 4.5z" />
+                                            </svg>
+                                            Xem playback
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </>

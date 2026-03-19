@@ -9,6 +9,7 @@ type Camera struct {
 	Location    string    `db:"location" json:"location"`
 	StreamURL   string    `db:"stream_url" json:"streamUrl"`
 	IsRecording bool      `db:"is_recording" json:"isRecording"`
+	AutoRecord  bool      `db:"auto_record" json:"autoRecord"` // Enable auto-recording when stream is ready
 	CreatedAt   time.Time `db:"created_at" json:"createdAt"`
 	UpdatedAt   time.Time `db:"updated_at" json:"updatedAt"`
 }
@@ -18,6 +19,7 @@ type CreateCameraRequest struct {
 	Location    string `json:"location"`
 	StreamURL   string `json:"streamUrl"`
 	IsRecording bool   `json:"isRecording"`
+	AutoRecord  bool   `json:"autoRecord"`
 }
 
 type UpdateCameraRequest struct {
@@ -25,4 +27,5 @@ type UpdateCameraRequest struct {
 	Location    string `json:"location"`
 	StreamURL   string `json:"streamUrl"`
 	IsRecording bool   `json:"isRecording"`
+	AutoRecord  bool   `json:"autoRecord"`
 }

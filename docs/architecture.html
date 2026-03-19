@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Dashboard - Architecture</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 40px;
+            color: #fff;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 40px;
+            color: #00d4ff;
+            font-size: 2.5em;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .diagram {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        .row {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        .box {
+            padding: 20px 30px;
+            border-radius: 12px;
+            text-align: center;
+            min-width: 180px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            position: relative;
+            transition: transform 0.3s;
+        }
+        .box:hover {
+            transform: translateY(-5px);
+        }
+        .box h3 {
+            font-size: 1.2em;
+            margin-bottom: 8px;
+        }
+        .box p {
+            font-size: 0.85em;
+            opacity: 0.9;
+        }
+        .box .tech {
+            font-size: 0.75em;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+
+        /* External Sources */
+        .external {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+        }
+
+        /* Media Server */
+        .media {
+            background: linear-gradient(135deg, #feca57, #ff9f43);
+            color: #333;
+        }
+
+        /* Proxy */
+        .proxy {
+            background: linear-gradient(135deg, #5f27cd, #341f97);
+        }
+
+        /* Backend */
+        .backend {
+            background: linear-gradient(135deg, #00d2d3, #01a3a4);
+        }
+
+        /* Frontend */
+        .frontend {
+            background: linear-gradient(135deg, #54a0ff, #2e86de);
+        }
+
+        /* Database */
+        .database {
+            background: linear-gradient(135deg, #ff9ff3, #f368e0);
+        }
+
+        /* Storage */
+        .storage {
+            background: linear-gradient(135deg, #48dbfb, #0abde3);
+        }
+
+        /* Services */
+        .service {
+            background: linear-gradient(135deg, #1dd1a1, #10ac84);
+        }
+
+        /* Arrows */
+        .arrow {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #00d4ff;
+            font-size: 2em;
+        }
+        .arrow-down::after {
+            content: '▼';
+        }
+        .arrow-both::after {
+            content: '⬍';
+        }
+
+        /* Section labels */
+        .section-label {
+            background: rgba(255,255,255,0.1);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            color: #aaa;
+            margin-bottom: 15px;
+            display: inline-block;
+        }
+
+        .section {
+            text-align: center;
+        }
+
+        /* Connection lines */
+        .connections {
+            display: flex;
+            justify-content: center;
+            gap: 100px;
+            margin: 10px 0;
+        }
+        .conn-line {
+            width: 2px;
+            height: 30px;
+            background: #00d4ff;
+        }
+
+        /* Legend */
+        .legend {
+            margin-top: 50px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+        }
+        .legend h3 {
+            margin-bottom: 15px;
+            color: #00d4ff;
+        }
+        .legend-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+
+        /* Flow description */
+        .flow {
+            margin-top: 40px;
+            padding: 25px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+        }
+        .flow h3 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+        }
+        .flow ol {
+            padding-left: 20px;
+        }
+        .flow li {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        .flow code {
+            background: rgba(0,212,255,0.2);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 Camera Dashboard Architecture</h1>
+
+        <div class="diagram">
+            <!-- External Sources -->
+            <div class="section">
+                <span class="section-label">📡 External Sources</span>
+                <div class="row">
+                    <div class="box external">
+                        <h3>🎥 IP Cameras</h3>
+                        <p>RTMP/RTSP Streams</p>
+                        <p class="tech">drone_stream1, stream_1...</p>
+                    </div>
+                    <div class="box external">
+                        <h3>🚁 Drones</h3>
+                        <p>Live Video Feed</p>
+                        <p class="tech">RTMP push</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="arrow arrow-down"></div>
+
+            <!-- Media Server -->
+            <div class="section">
+                <span class="section-label">🖥️ Media Server</span>
+                <div class="row">
+                    <div class="box media">
+                        <h3>📺 MediaMTX</h3>
+                        <p>RTMP → HLS Converter</p>
+                        <p class="tech">:1935 RTMP | :8888 HLS | :9997 API</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="arrow arrow-both"></div>
+
+            <!-- Nginx + Backend -->
+            <div class="section">
+                <span class="section-label">⚙️ Application Layer</span>
+                <div class="row">
+                    <div class="box proxy">
+                        <h3>🔀 Nginx Proxy</h3>
+                        <p>Reverse Proxy & Rate Limit</p>
+                        <p class="tech">:80 HTTP | /hls/* | /api/*</p>
+                    </div>
+                    <div class="box backend">
+                        <h3>🔧 Go Backend</h3>
+                        <p>REST API + Webhooks</p>
+                        <p class="tech">Chi Router | :8080</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="arrow arrow-both"></div>
+
+            <!-- Services -->
+            <div class="section">
+                <span class="section-label">🛠️ Services</span>
+                <div class="row">
+                    <div class="box service">
+                        <h3>🎬 FFmpeg Recorder</h3>
+                        <p>Auto Recording</p>
+                        <p class="tech">15min segments | MP4</p>
+                    </div>
+                    <div class="box service">
+                        <h3>🔄 HLS Converter</h3>
+                        <p>MP4 → HLS for Playback</p>
+                        <p class="tech">Background worker</p>
+                    </div>
+                    <div class="box service">
+                        <h3>📡 Webhook Handler</h3>
+                        <p>Stream Events</p>
+                        <p class="tech">runOnReady/NotReady</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="arrow arrow-both"></div>
+
+            <!-- Storage -->
+            <div class="section">
+                <span class="section-label">💾 Storage</span>
+                <div class="row">
+                    <div class="box database">
+                        <h3>🗄️ SQLite</h3>
+                        <p>Database</p>
+                        <p class="tech">cameras, projects, recordings</p>
+                    </div>
+                    <div class="box storage">
+                        <h3>📁 SMB Storage</h3>
+                        <p>Video Files</p>
+                        <p class="tech">/recordings/{project}/{camera}/</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="arrow arrow-down"></div>
+
+            <!-- Frontend -->
+            <div class="section">
+                <span class="section-label">🌐 Frontend</span>
+                <div class="row">
+                    <div class="box frontend">
+                        <h3>⚛️ React Dashboard</h3>
+                        <p>Camera Monitoring UI</p>
+                        <p class="tech">Vite | HLS.js | :5173</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="legend">
+            <h3>📋 Legend</h3>
+            <div class="legend-items">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #ff6b6b, #ee5a5a);"></div>
+                    <span>External Sources</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #feca57, #ff9f43);"></div>
+                    <span>Media Server</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #5f27cd, #341f97);"></div>
+                    <span>Proxy</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #00d2d3, #01a3a4);"></div>
+                    <span>Backend API</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #1dd1a1, #10ac84);"></div>
+                    <span>Services</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #ff9ff3, #f368e0);"></div>
+                    <span>Database</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #48dbfb, #0abde3);"></div>
+                    <span>Storage</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #54a0ff, #2e86de);"></div>
+                    <span>Frontend</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Flow Description -->
+        <div class="flow">
+            <h3>🔄 Auto-Record Flow</h3>
+            <ol>
+                <li><strong>Camera push stream</strong> → MediaMTX nhận RTMP tại <code>:1935</code></li>
+                <li><strong>MediaMTX webhook</strong> → Gọi <code>/api/internal/webhooks/stream-ready</code></li>
+                <li><strong>Backend check</strong> → Camera có <code>auto_record=1</code>?</li>
+                <li><strong>Start FFmpeg</strong> → Record HLS stream → MP4 (15 phút/segment)</li>
+                <li><strong>Stream ngắt</strong> → Webhook <code>stream-not-ready</code> → Stop recording</li>
+                <li><strong>HLS Converter</strong> → Convert MP4 → HLS để playback trên web</li>
+            </ol>
+        </div>
+    </div>
+</body>
+</html>

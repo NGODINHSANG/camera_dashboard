@@ -210,6 +210,7 @@ function Dashboard() {
                 location: newCameraData.location,
                 streamUrl: newCameraData.streamUrl,
                 isRecording: newCameraData.isRecording,
+                autoRecord: newCameraData.autoRecord,
                 aspectRatio: newCameraData.aspectRatio || 'auto'
             })
             const newCamera = response.data
@@ -248,6 +249,7 @@ function Dashboard() {
                 location: updatedCameraData.location,
                 streamUrl: updatedCameraData.streamUrl,
                 isRecording: updatedCameraData.isRecording,
+                autoRecord: updatedCameraData.autoRecord,
                 aspectRatio: updatedCameraData.aspectRatio || 'auto'
             })
             const updatedCamera = response.data

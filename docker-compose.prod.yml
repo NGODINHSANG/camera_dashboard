@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   backend:
-    image: camera-dashboard-backend:v2.0
+    image: camera-dashboard-backend:v2.1
     container_name: camera-dashboard-backend
     restart: unless-stopped
     environment:
@@ -31,7 +31,7 @@ services:
       retries: 3
 
   frontend:
-    image: camera-dashboard-frontend:v2.0
+    image: camera-dashboard-frontend:v2.1
     container_name: camera-dashboard-frontend
     restart: unless-stopped
     environment:
@@ -65,7 +65,7 @@ services:
 
   # MediaMTX (RTSP/HLS/WebRTC streaming server)
   mediamtx:
-    image: bluenviron/mediamtx:latest
+    image: camera-mediamtx:v2.1
     container_name: camera-mediamtx
     restart: unless-stopped
     ports:

@@ -39,6 +39,11 @@ func Setup(db *sqlx.DB, cfg *config.Config) *chi.Mux {
 	cameraHandler := handlers.NewCameraHandler(cameraRepo, projectRepo)
 	adminHandler := handlers.NewAdminHandler(userRepo, projectRepo, cameraRepo)
 	recordingHandler := handlers.NewRecordingHandler(db, recorderService, cfg.RecordingsPath)
+	webhookHandler := handlers.NewWebhookHandler(db, recorderService, cfg.RecordingsPath)
+
+	// Wire up auto-record callbacks
+	cameraHandler.SetAutoRecordCallback(webhookHandler.TriggerAutoRecordForCamera)
+	cameraHandler.SetAutoRecordDisableCallback(webhookHandler.StopRecordingForCamera)
 
 	// Initialize HLS cache (local disk for segments, avoids SMB reads)
 	services.InitHLSCache(cfg.HLSCachePath, cfg.RecordingsPath)
@@ -47,12 +52,25 @@ func Setup(db *sqlx.DB, cfg *config.Config) *chi.Mux {
 	hlsConverter := services.NewHLSConverter(cfg.RecordingsPath, db)
 	hlsConverter.StartWorker(2 * time.Minute)
 
+	// Start periodic auto-record check (every 30 seconds)
+	// This ensures cameras with auto_record=1 and active streams are always recording
+	go func() {
+		time.Sleep(10 * time.Second) // Wait for MediaMTX to be fully ready
+		webhookHandler.StartPeriodicCheck(30 * time.Second)
+	}()
+
 	// Routes
 	r.Route("/api", func(r chi.Router) {
 		// Health check (public)
 		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"status":"ok"}`))
+		})
+
+		// Internal webhook routes (from MediaMTX - no auth required)
+		r.Route("/internal/webhooks", func(r chi.Router) {
+			r.Post("/stream-ready", webhookHandler.HandleStreamReady)
+			r.Post("/stream-not-ready", webhookHandler.HandleStreamNotReady)
 		})
 
 		// Public video streaming routes (no auth required for video element)
