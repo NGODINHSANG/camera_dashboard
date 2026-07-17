@@ -31,11 +31,12 @@ type UserLoginRequest struct {
 }
 
 type UserResponse struct {
-	ID        int64     `json:"id"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	Role      Role      `json:"role"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID                 int64     `json:"id"`
+	Email              string    `json:"email"`
+	Name               string    `json:"name"`
+	Role               Role      `json:"role"`
+	CreatedAt          time.Time `json:"createdAt"`
+	ProjectPermissions []int64   `json:"projectPermissions"`
 }
 
 type UserWithStats struct {
@@ -45,10 +46,11 @@ type UserWithStats struct {
 
 func (u *User) ToResponse() UserResponse {
 	return UserResponse{
-		ID:        u.ID,
-		Email:     u.Email,
-		Name:      u.Name,
-		Role:      u.Role,
-		CreatedAt: u.CreatedAt,
+		ID:                 u.ID,
+		Email:              u.Email,
+		Name:               u.Name,
+		Role:               u.Role,
+		CreatedAt:          u.CreatedAt,
+		ProjectPermissions: []int64{},
 	}
 }

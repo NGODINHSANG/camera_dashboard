@@ -1,9 +1,10 @@
 .camera-frame {
     position: relative;
-    background: #2a2a3e;
+    background: #050a12;
     overflow: hidden;
-    border: 1px solid #3a3a5a;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 2px solid rgba(0, 212, 255, 0.6);
+    box-shadow: 0 0 18px rgba(0, 212, 255, 0.25), 0 0 4px rgba(0, 212, 255, 0.4) inset;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 /* Aspect Ratio Classes */
@@ -21,7 +22,8 @@
 
 .camera-frame:not(.fullscreen):hover {
     transform: scale(1.01);
-    box-shadow: 0 0 20px rgba(0, 188, 212, 0.3);
+    border-color: rgba(0, 212, 255, 1);
+    box-shadow: 0 0 30px rgba(0, 212, 255, 0.6), 0 0 80px rgba(0, 212, 255, 0.15);
     z-index: 5;
 }
 
@@ -40,7 +42,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #353550 0%, #252540 100%);
+    background: linear-gradient(135deg, #050d18 0%, #020810 100%);
     position: relative;
 }
 
@@ -72,7 +74,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #353550 0%, #252540 100%);
+    background: linear-gradient(135deg, #050d18 0%, #020810 100%);
 }
 
 .no-signal {

@@ -80,10 +80,13 @@ func (r *UserRepository) EmailExists(email string) (bool, error) {
 
 func (r *UserRepository) GetAll() ([]models.UserWithStats, error) {
 	var users []models.UserWithStats
-	query := `SELECT u.*, COALESCE(COUNT(p.id), 0) as project_count
+	query := `SELECT u.*,
+			  (
+			    SELECT COUNT(DISTINCT p.id) FROM projects p
+			    WHERE p.user_id = u.id
+			    OR p.id IN (SELECT project_id FROM project_permissions WHERE user_id = u.id)
+			  ) as project_count
 			  FROM users u
-			  LEFT JOIN projects p ON u.id = p.user_id
-			  GROUP BY u.id
 			  ORDER BY u.created_at DESC`
 
 	err := r.db.Select(&users, query)

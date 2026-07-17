@@ -6,16 +6,18 @@ import (
 
 	"camera-dashboard-backend/internal/middleware"
 	"camera-dashboard-backend/internal/models"
+	"camera-dashboard-backend/internal/repository"
 	"camera-dashboard-backend/internal/services"
 	"camera-dashboard-backend/pkg/response"
 )
 
 type AuthHandler struct {
 	authService *services.AuthService
+	permRepo    *repository.ProjectPermissionRepository
 }
 
-func NewAuthHandler(authService *services.AuthService) *AuthHandler {
-	return &AuthHandler{authService: authService}
+func NewAuthHandler(authService *services.AuthService, permRepo *repository.ProjectPermissionRepository) *AuthHandler {
+	return &AuthHandler{authService: authService, permRepo: permRepo}
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -92,6 +94,12 @@ func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response.NotFound(w, "User not found")
 		return
+	}
+
+	// Attach project-level permissions for non-global-admin users
+	if user.Role != models.RoleAdmin {
+		projectIDs, _ := h.permRepo.GetUserProjectIDs(user.ID)
+		user.ProjectPermissions = projectIDs
 	}
 
 	response.JSON(w, http.StatusOK, user)

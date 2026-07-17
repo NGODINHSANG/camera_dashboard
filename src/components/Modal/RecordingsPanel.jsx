@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react'
 import { recordingsApi } from '../../api/recordings'
+import { useAuth } from '../../contexts/AuthContext'
+import UploadVideo from '../UploadVideo/UploadVideo'
 import './RecordingsPanel.css'
 
-function RecordingsPanel({ camera, onClose, onPlayRecording, onPlayPlaylist }) {
+function RecordingsPanel({ camera, onClose, onPlayRecording, onPlayPlaylist, projects }) {
+    const { isProjectAdmin } = useAuth()
+    const isAdmin = isProjectAdmin(camera?.projectId)
     const [recordings, setRecordings] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
+    const [showUploadModal, setShowUploadModal] = useState(false)
 
     // Format file size
     const formatFileSize = (bytes) => {
@@ -102,6 +107,22 @@ function RecordingsPanel({ camera, onClose, onPlayRecording, onPlayPlaylist }) {
         }
     }
 
+    // Refresh recordings list when upload completes
+    const handleUploadComplete = () => {
+        // Re-fetch recordings
+        const fetchRecordings = async () => {
+            try {
+                const projectName = camera.projectName || 'Unknown'
+                const cameraName = camera.name
+                const files = await recordingsApi.listFiles(projectName, cameraName)
+                setRecordings(Array.isArray(files) ? files : [])
+            } catch (err) {
+                console.error('Error refreshing recordings:', err)
+            }
+        }
+        fetchRecordings()
+    }
+
     return (
         <>
             <div className="recordings-panel-overlay" onClick={onClose}>
@@ -117,11 +138,25 @@ function RecordingsPanel({ camera, onClose, onPlayRecording, onPlayPlaylist }) {
                                 <p className="recordings-subtitle">{camera.projectName || 'Du an'}</p>
                             </div>
                         </div>
-                        <button className="recordings-close" onClick={onClose}>
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                            </svg>
-                        </button>
+                        <div className="recordings-header-actions">
+                            {isAdmin && (
+                                <button
+                                    className="upload-video-btn"
+                                    onClick={() => setShowUploadModal(true)}
+                                    title="Upload video"
+                                >
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
+                                    </svg>
+                                    Upload
+                                </button>
+                            )}
+                            <button className="recordings-close" onClick={onClose}>
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
 
                     {/* Content */}
@@ -220,6 +255,16 @@ function RecordingsPanel({ camera, onClose, onPlayRecording, onPlayPlaylist }) {
                 </div>
             </div>
 
+            {/* Upload Video Modal - Admin only */}
+            {isAdmin && showUploadModal && (
+                <UploadVideo
+                    isOpen={showUploadModal}
+                    onClose={() => setShowUploadModal(false)}
+                    projects={projects || [{ id: camera.projectId, name: camera.projectName }]}
+                    preSelectedCamera={{ id: camera.id, name: camera.name, project_id: camera.projectId, projectName: camera.projectName }}
+                    onUploadComplete={handleUploadComplete}
+                />
+            )}
         </>
     )
 }

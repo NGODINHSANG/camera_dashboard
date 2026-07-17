@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import './Footer.css'
 
-function Footer({ isLive, gridLayout, onGridLayoutChange, aspectRatio, onAspectRatioChange }) {
+function Footer({ isLive, isPlayback, gridLayout, onGridLayoutChange, aspectRatio, onAspectRatioChange }) {
     const [showAspectMenu, setShowAspectMenu] = useState(false)
     const menuRef = useRef(null)
     const btnRef = useRef(null)
 
     const gridOptions = [
+        { value: '1x1', label: '1×1', cols: 1 },
         { value: '2x2', label: '2×2', cols: 2 },
         { value: '3x3', label: '3×3', cols: 3 },
         { value: '4x4', label: '4×4', cols: 4 },
@@ -36,9 +37,9 @@ function Footer({ isLive, gridLayout, onGridLayoutChange, aspectRatio, onAspectR
     return (
         <footer className="footer">
             <div className="footer-left">
-                <div className="live-indicator">
-                    <span className="live-text">LIVE</span>
-                    <span className={`live-dot ${isLive ? 'active' : ''}`}></span>
+                <div className={`live-indicator ${isPlayback ? 'playback' : ''}`}>
+                    <span className="live-text">{isPlayback ? 'PHÁT LẠI' : 'LIVE'}</span>
+                    <span className={`live-dot ${isLive && !isPlayback ? 'active' : ''}`}></span>
                 </div>
             </div>
 

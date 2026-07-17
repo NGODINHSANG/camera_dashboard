@@ -1,31 +1,33 @@
 /* Global Styles & CSS Variables */
 :root {
   /* Colors */
-  --bg-primary: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #7e22ce 100%);
-  --bg-secondary: rgba(26, 32, 44, 0.95);
-  --bg-header: #ffffff;
-  --bg-footer: rgba(26, 32, 44, 0.95);
-  --bg-camera: rgba(255, 255, 255, 0.12);
-  --bg-camera-frame: rgba(255, 255, 255, 0.18);
-  
+  --bg-primary: #0a0e1a;
+  --bg-secondary: rgba(10, 16, 30, 0.97);
+  --bg-header: #0d1220;
+  --bg-footer: rgba(10, 16, 30, 0.97);
+  --bg-camera: rgba(0, 0, 0, 0.6);
+  --bg-camera-frame: rgba(0, 20, 40, 0.8);
+
   /* Text Colors */
-  --text-primary: #ffffff;
-  --text-secondary: #b0b0c0;
-  --text-muted: #707080;
-  
+  --text-primary: #e0f0ff;
+  --text-secondary: #7a9bb5;
+  --text-muted: #3a5570;
+
   /* Status Colors */
   --status-online: #00e676;
   --status-offline: #ff5252;
   --status-recording: #ff1744;
   --status-live: #ff1744;
-  
+
   /* Accent Colors */
-  --accent-blue: #00bcd4;
+  --accent-primary: #00d4ff;
+  --accent-blue: #00d4ff;
   --accent-purple: #7c4dff;
-  
+  --accent-secondary: #7c4dff;
+
   /* Borders */
-  --border-color: rgba(255, 255, 255, 0.15);
-  --border-light: rgba(255, 255, 255, 0.2);
+  --border-color: rgba(0, 180, 220, 0.2);
+  --border-light: rgba(0, 180, 220, 0.3);
   
   /* Shadows */
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
@@ -66,7 +68,7 @@ html, body {
 
 body {
   font-family: var(--font-family);
-  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #7e22ce 100%);
+  background: #0a0e1a;
   background-attachment: fixed;
   color: var(--text-primary);
   line-height: 1.5;

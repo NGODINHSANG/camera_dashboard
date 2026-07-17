@@ -15,16 +15,18 @@ var (
 type Claims struct {
 	UserID int64  `json:"userId"`
 	Email  string `json:"email"`
+	Name   string `json:"name"`
 	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(userID int64, email, role, secret string) (string, time.Time, error) {
+func GenerateToken(userID int64, email, name, role, secret string) (string, time.Time, error) {
 	expiresAt := time.Now().Add(24 * time.Hour)
 
 	claims := &Claims{
 		UserID: userID,
 		Email:  email,
+		Name:   name,
 		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),

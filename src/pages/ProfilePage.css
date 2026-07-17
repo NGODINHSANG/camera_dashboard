@@ -1,5 +1,6 @@
 .profile-page {
-    min-height: 100vh;
+    height: 100vh;
+    overflow-y: auto;
     background: var(--bg-primary);
     padding: var(--spacing-xl) var(--spacing-md);
 }

@@ -15,7 +15,8 @@ function CameraGrid({
     onAddCamera,
     hasProject,
     isAdmin = false,
-    selectedProject
+    selectedProject,
+    onPlaybackChange
 }) {
     // Recording state
     const [recordingStates, setRecordingStates] = useState({}) // { cameraId: { isRecording, recordingId } }
@@ -31,6 +32,12 @@ function CameraGrid({
     useEffect(() => {
         loadActiveRecordings()
     }, [])
+
+    // Notify parent when playback state changes
+    useEffect(() => {
+        const isPlayback = Object.keys(playbackRecordings).length > 0
+        onPlaybackChange?.(isPlayback)
+    }, [playbackRecordings, onPlaybackChange])
 
     const loadActiveRecordings = async () => {
         try {

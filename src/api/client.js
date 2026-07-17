@@ -53,7 +53,9 @@ class ApiClient {
                     this.removeToken();
                     window.location.href = '/login';
                 }
-                throw new Error(data?.error?.message || data?.message || 'Request failed');
+                const errMsg = typeof data?.error === 'string' ? data.error : data?.error?.message || data?.message || `HTTP ${response.status}`;
+                console.error(`[API] ${options.method || 'GET'} ${endpoint} → ${response.status}:`, errMsg);
+                throw new Error(errMsg);
             }
 
             return data || {};

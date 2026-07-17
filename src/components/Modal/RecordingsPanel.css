@@ -61,6 +61,37 @@
     margin: 2px 0 0 0;
 }
 
+.recordings-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.upload-video-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: linear-gradient(135deg, #00d4ff, #00b8e6);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: #000;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.upload-video-btn:hover {
+    background: linear-gradient(135deg, #00b8e6, #009dd1);
+    transform: translateY(-1px);
+}
+
+.upload-video-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
 .recordings-close {
     background: transparent;
     border: none;

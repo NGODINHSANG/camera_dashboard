@@ -69,7 +69,7 @@ func (s *AuthService) Register(req *models.UserRegisterRequest) (*AuthResult, er
 	}
 
 	// Generate token
-	token, expiresAt, err := jwt.GenerateToken(user.ID, user.Email, string(user.Role), s.jwtSecret)
+	token, expiresAt, err := jwt.GenerateToken(user.ID, user.Email, user.Name, string(user.Role), s.jwtSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (s *AuthService) Login(req *models.UserLoginRequest) (*AuthResult, error) {
 	}
 
 	// Generate token
-	token, expiresAt, err := jwt.GenerateToken(user.ID, user.Email, string(user.Role), s.jwtSecret)
+	token, expiresAt, err := jwt.GenerateToken(user.ID, user.Email, user.Name, string(user.Role), s.jwtSecret)
 	if err != nil {
 		return nil, err
 	}

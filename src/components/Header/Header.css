@@ -3,12 +3,12 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--spacing-sm) var(--spacing-md);
-    background: #ffffff;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    background: #0d1220;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.25);
     min-height: 50px;
     gap: var(--spacing-md);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    color: #1a1a2e;
+    box-shadow: 0 2px 20px rgba(0, 212, 255, 0.1);
+    color: #ffffff;
 }
 
 /* Left Section */
@@ -46,24 +46,23 @@
 }
 
 .logo {
-    width: 40px;
-    height: 40px;
+    height: 50px;
+    margin: -8px 0;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .logo-icon {
-    width: 100%;
     height: 100%;
+    width: auto;
     object-fit: contain;
-    border-radius: var(--radius-sm);
 }
 
 .header-title {
     font-size: 1.25rem;
     font-weight: 600;
-    color: #1a1a2e;
+    color: #ffffff;
     letter-spacing: 0.5px;
     white-space: nowrap;
 }
@@ -104,11 +103,11 @@
 }
 
 .status-label {
-    color: #6b7280;
+    color: rgba(255, 255, 255, 0.7);
 }
 
 .status-value {
-    color: #1a1a2e;
+    color: #ffffff;
     font-weight: 600;
 }
 
@@ -182,6 +181,29 @@
     gap: var(--spacing-md);
 }
 
+.chat-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 212, 255, 0.5);
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.15) 0%, rgba(0, 150, 220, 0.1) 100%);
+    color: #00d4ff;
+    text-decoration: none;
+    transition: all 0.2s;
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+}
+.chat-nav-btn svg { width: 24px; height: 24px; }
+.chat-nav-btn:hover {
+    border-color: #00d4ff;
+    color: #ffffff;
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.35) 0%, rgba(0, 150, 220, 0.25) 100%);
+    box-shadow: 0 0 16px rgba(0, 212, 255, 0.45);
+    transform: translateY(-1px);
+}
+
 .datetime {
     display: flex;
     flex-direction: column;
@@ -192,13 +214,13 @@
 .time {
     font-size: 1.1rem;
     font-weight: 600;
-    color: #1a1a2e;
+    color: #ffffff;
     font-variant-numeric: tabular-nums;
 }
 
 .date {
     font-size: 0.7rem;
-    color: #6b7280;
+    color: rgba(255, 255, 255, 0.7);
 }
 
 .menu-btn {
