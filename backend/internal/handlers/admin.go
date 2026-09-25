@@ -16,13 +16,15 @@ type AdminHandler struct {
 	userRepo    *repository.UserRepository
 	projectRepo *repository.ProjectRepository
 	cameraRepo  *repository.CameraRepository
+	permRepo    *repository.ProjectPermissionRepository
 }
 
-func NewAdminHandler(userRepo *repository.UserRepository, projectRepo *repository.ProjectRepository, cameraRepo *repository.CameraRepository) *AdminHandler {
+func NewAdminHandler(userRepo *repository.UserRepository, projectRepo *repository.ProjectRepository, cameraRepo *repository.CameraRepository, permRepo *repository.ProjectPermissionRepository) *AdminHandler {
 	return &AdminHandler{
 		userRepo:    userRepo,
 		projectRepo: projectRepo,
 		cameraRepo:  cameraRepo,
+		permRepo:    permRepo,
 	}
 }
 
@@ -116,6 +118,98 @@ func (h *AdminHandler) UpdateUserRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.JSON(w, http.StatusOK, user.ToResponse())
+}
+
+func (h *AdminHandler) GetProjectMembers(w http.ResponseWriter, r *http.Request) {
+	projectIDStr := chi.URLParam(r, "projectId")
+	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
+	if err != nil {
+		response.ValidationError(w, "Invalid project ID")
+		return
+	}
+
+	members, err := h.permRepo.GetProjectMembers(projectID)
+	if err != nil {
+		response.InternalError(w, "Failed to fetch project members")
+		return
+	}
+
+	response.JSON(w, http.StatusOK, members)
+}
+
+func (h *AdminHandler) GrantProjectPermission(w http.ResponseWriter, r *http.Request) {
+	projectIDStr := chi.URLParam(r, "projectId")
+	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
+	if err != nil {
+		response.ValidationError(w, "Invalid project ID")
+		return
+	}
+
+	userIDStr := chi.URLParam(r, "userId")
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		response.ValidationError(w, "Invalid user ID")
+		return
+	}
+
+	// Check project exists
+	if _, err := h.projectRepo.GetByID(projectID); err != nil {
+		response.NotFound(w, "Project not found")
+		return
+	}
+
+	// Check user exists
+	if _, err := h.userRepo.GetByID(userID); err != nil {
+		response.NotFound(w, "User not found")
+		return
+	}
+
+	if err := h.permRepo.Grant(userID, projectID); err != nil {
+		response.InternalError(w, "Failed to grant permission")
+		return
+	}
+
+	response.JSON(w, http.StatusOK, map[string]string{"message": "Permission granted"})
+}
+
+func (h *AdminHandler) RevokeProjectPermission(w http.ResponseWriter, r *http.Request) {
+	projectIDStr := chi.URLParam(r, "projectId")
+	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
+	if err != nil {
+		response.ValidationError(w, "Invalid project ID")
+		return
+	}
+
+	userIDStr := chi.URLParam(r, "userId")
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		response.ValidationError(w, "Invalid user ID")
+		return
+	}
+
+	if err := h.permRepo.Revoke(userID, projectID); err != nil {
+		response.InternalError(w, "Failed to revoke permission")
+		return
+	}
+
+	response.JSON(w, http.StatusOK, map[string]string{"message": "Permission revoked"})
+}
+
+func (h *AdminHandler) GetUserProjectPermissions(w http.ResponseWriter, r *http.Request) {
+	userIDStr := chi.URLParam(r, "id")
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		response.ValidationError(w, "Invalid user ID")
+		return
+	}
+
+	projectIDs, err := h.permRepo.GetUserProjectIDs(userID)
+	if err != nil {
+		response.InternalError(w, "Failed to fetch permissions")
+		return
+	}
+
+	response.JSON(w, http.StatusOK, map[string]interface{}{"project_ids": projectIDs})
 }
 
 func (h *AdminHandler) GetAllProjects(w http.ResponseWriter, r *http.Request) {

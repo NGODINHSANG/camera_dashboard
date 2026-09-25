@@ -39,11 +39,19 @@ export function AuthProvider({ children }) {
         setUser(null);
     }, []);
 
+    const projectPermissions = user?.projectPermissions ?? []
+    const isAdmin = user?.role === 'admin'
+
+    const isProjectAdmin = (projectId) =>
+        isAdmin || projectPermissions.includes(Number(projectId))
+
     const value = {
         user,
         loading,
         isAuthenticated: !!user,
-        isAdmin: user?.role === 'admin',
+        isAdmin,
+        projectPermissions,
+        isProjectAdmin,
         login,
         register,
         logout,

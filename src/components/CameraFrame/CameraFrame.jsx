@@ -56,7 +56,7 @@ function PlaybackHLS({ hlsUrl, onEnded, onError, loop = true }) {
                     setIsLoading(false)
                     switch (data.type) {
                         case Hls.ErrorTypes.NETWORK_ERROR:
-                            setError('Lỗi mạng khi tải video')
+                            setError('Đường truyền mạng kém ổn định')
                             // Try to recover
                             hls.startLoad()
                             break

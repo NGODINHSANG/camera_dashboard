@@ -20,10 +20,11 @@ import AdminPage from './pages/AdminPage'
 import SettingsPage from './pages/SettingsPage'
 import SupportPage from './pages/SupportPage'
 import ProfilePage from './pages/ProfilePage'
+import MessagesPage from './pages/MessagesPage'
 import './App.css'
 
 function Dashboard() {
-    const { user, logout, isAdmin } = useAuth()
+    const { user, logout, isAdmin, isProjectAdmin } = useAuth()
 
     // State cho dữ liệu từ API
     const [projects, setProjects] = useState([])
@@ -40,6 +41,7 @@ function Dashboard() {
     // State tạm (không cần lưu)
     const [cameraStatus, setCameraStatus] = useState({})
     const [isLive, setIsLive] = useState(true)
+    const [isPlayback, setIsPlayback] = useState(false)
     const [selectedCamera, setSelectedCamera] = useState(null)
 
     // State cho modals - Camera
@@ -339,6 +341,9 @@ function Dashboard() {
         )
     }
 
+    // Project admin: global admin hoặc có quyền trong dự án đang chọn
+    const canManageProject = isProjectAdmin(selectedProjectId)
+
     return (
         <div className="app">
             <Header
@@ -349,7 +354,7 @@ function Dashboard() {
                 onBackClick={handleBackToGrid}
                 user={user}
                 onLogout={handleLogoutClick}
-                isAdmin={isAdmin}
+                isAdmin={canManageProject}
                 onAddCamera={() => setShowAddCameraModal(true)}
                 hasProject={!!selectedProject}
             />
@@ -361,11 +366,6 @@ function Dashboard() {
                     onAddProject={() => setShowAddProjectModal(true)}
                     onEditProject={handleEditProjectClick}
                     onDeleteProject={handleDeleteProjectClick}
-                    onCameraFullscreen={(camera, project) => {
-                        // Select the project first, then show camera fullscreen
-                        setSelectedProjectId(project.id)
-                        setSelectedCamera(camera)
-                    }}
                     isAdmin={isAdmin}
                 />
                 <main className="main-content">
@@ -380,13 +380,15 @@ function Dashboard() {
                         onDeleteCamera={handleDeleteCameraClick}
                         onAddCamera={() => setShowAddCameraModal(true)}
                         hasProject={!!selectedProject}
-                        isAdmin={isAdmin}
+                        isAdmin={canManageProject}
                         selectedProject={selectedProject}
+                        onPlaybackChange={setIsPlayback}
                     />
                 </main>
             </div>
             <Footer
                 isLive={isLive}
+                isPlayback={isPlayback}
                 gridLayout={gridLayout}
                 onGridLayoutChange={handleGridLayoutChange}
                 aspectRatio={aspectRatio}
@@ -550,6 +552,14 @@ function App() {
                 element={
                     <ProtectedRoute>
                         <SupportPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/messages"
+                element={
+                    <ProtectedRoute>
+                        <MessagesPage />
                     </ProtectedRoute>
                 }
             />

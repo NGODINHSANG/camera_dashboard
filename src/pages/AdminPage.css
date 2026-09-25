@@ -1,0 +1,134 @@
+/* Admin Tabs */
+.admin-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.admin-tab {
+    padding: 10px 20px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: -1px;
+}
+
+.admin-tab:hover {
+    color: var(--text-primary);
+}
+
+.admin-tab.active {
+    color: #00bcd4;
+    border-bottom-color: #00bcd4;
+}
+
+/* Project select */
+.project-select-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.project-select {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #0097a7 0%, #00bcd4 100%);
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 0.9rem;
+    font-weight: 500;
+    min-width: 220px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 188, 212, 0.4);
+}
+
+.project-select option {
+    background: #1f2937;
+    color: #ffffff;
+}
+
+.project-select:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.3);
+}
+
+/* Members sections */
+.members-section {
+    margin-bottom: 28px;
+}
+
+.members-section h3 {
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.members-count {
+    color: var(--text-secondary);
+    font-weight: 400;
+    font-size: 0.85rem;
+}
+
+.members-loading,
+.members-empty {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    padding: 16px 0;
+}
+
+/* Permission modal */
+.perm-modal-body {
+    padding: 4px 0;
+}
+
+.perm-modal-desc {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+    line-height: 1.5;
+}
+
+.perm-modal-desc strong {
+    color: var(--text-primary);
+}
+
+.perm-project-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.perm-project-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: background 0.15s;
+}
+
+.perm-project-item.granted {
+    background: rgba(0, 188, 212, 0.08);
+    border-color: rgba(0, 188, 212, 0.3);
+}
+
+.perm-project-name {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}

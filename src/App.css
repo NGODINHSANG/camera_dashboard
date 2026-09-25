@@ -18,3 +18,7 @@
     overflow: hidden;
     display: flex;
 }
+
+.main-content.scrollable {
+    overflow-y: auto;
+}

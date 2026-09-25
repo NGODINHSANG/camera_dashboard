@@ -16,15 +16,21 @@ import (
 type CameraHandler struct {
 	cameraRepo          *repository.CameraRepository
 	projectRepo         *repository.ProjectRepository
+	permRepo            *repository.ProjectPermissionRepository
 	onAutoRecordEnable  func(cameraID int64) // Callback when auto_record is enabled
 	onAutoRecordDisable func(cameraID int64) // Callback when auto_record is disabled
 }
 
-func NewCameraHandler(cameraRepo *repository.CameraRepository, projectRepo *repository.ProjectRepository) *CameraHandler {
+func NewCameraHandler(cameraRepo *repository.CameraRepository, projectRepo *repository.ProjectRepository, permRepo *repository.ProjectPermissionRepository) *CameraHandler {
 	return &CameraHandler{
 		cameraRepo:  cameraRepo,
 		projectRepo: projectRepo,
+		permRepo:    permRepo,
 	}
+}
+
+func (h *CameraHandler) isProjectAdmin(claims *middleware.Claims, projectID int64) bool {
+	return claims.Role == "admin" || h.permRepo.HasPermission(claims.UserID, projectID)
 }
 
 // SetAutoRecordCallback sets the callback function called when auto_record is enabled
@@ -97,16 +103,15 @@ func (h *CameraHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Only admin can create cameras
-	if claims.Role != "admin" {
-		response.Forbidden(w, "Only admin can create cameras")
-		return
-	}
-
 	projectIDStr := chi.URLParam(r, "projectId")
 	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil {
 		response.ValidationError(w, "Invalid project ID")
+		return
+	}
+
+	if !h.isProjectAdmin(claims, projectID) {
+		response.Forbidden(w, "Only admin can create cameras")
 		return
 	}
 
@@ -160,16 +165,15 @@ func (h *CameraHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Only admin can update cameras
-	if claims.Role != "admin" {
-		response.Forbidden(w, "Only admin can update cameras")
-		return
-	}
-
 	projectIDStr := chi.URLParam(r, "projectId")
 	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil {
 		response.ValidationError(w, "Invalid project ID")
+		return
+	}
+
+	if !h.isProjectAdmin(claims, projectID) {
+		response.Forbidden(w, "Only admin can update cameras")
 		return
 	}
 
@@ -249,16 +253,15 @@ func (h *CameraHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Only admin can delete cameras
-	if claims.Role != "admin" {
-		response.Forbidden(w, "Only admin can delete cameras")
-		return
-	}
-
 	projectIDStr := chi.URLParam(r, "projectId")
 	projectID, err := strconv.ParseInt(projectIDStr, 10, 64)
 	if err != nil {
 		response.ValidationError(w, "Invalid project ID")
+		return
+	}
+
+	if !h.isProjectAdmin(claims, projectID) {
+		response.Forbidden(w, "Only admin can delete cameras")
 		return
 	}
 

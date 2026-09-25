@@ -9,10 +9,10 @@
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: repeat(2, 1fr);
-    gap: 2px;
+    gap: 3px;
     width: 100%;
     height: 100%;
-    background: #000;
+    background: #020608;
     overflow: hidden;
 }
 

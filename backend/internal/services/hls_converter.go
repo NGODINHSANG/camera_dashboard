@@ -94,8 +94,43 @@ func HasHLS(videoPath string) bool {
 	return err == nil
 }
 
-// ConvertToHLS converts a video file to HLS segments using -c copy
-// Keeps ORIGINAL QUALITY, bandwidth saved by only downloading segments being watched
+const maxBitrateBps = 2_000_000 // 2 Mbps threshold
+
+// probeBitrate returns the overall bitrate of a video file in bps using ffprobe
+func probeBitrate(videoPath string) (int64, error) {
+	cmd := exec.Command("ffprobe",
+		"-v", "error",
+		"-select_streams", "v:0",
+		"-show_entries", "stream=bit_rate",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		videoPath,
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		return 0, err
+	}
+	var bitrate int64
+	_, err = fmt.Sscanf(strings.TrimSpace(string(out)), "%d", &bitrate)
+	if err != nil || bitrate == 0 {
+		// fallback: use container-level bitrate
+		cmd2 := exec.Command("ffprobe",
+			"-v", "error",
+			"-show_entries", "format=bit_rate",
+			"-of", "default=noprint_wrappers=1:nokey=1",
+			videoPath,
+		)
+		out2, err2 := cmd2.Output()
+		if err2 != nil {
+			return 0, err2
+		}
+		fmt.Sscanf(strings.TrimSpace(string(out2)), "%d", &bitrate)
+	}
+	return bitrate, nil
+}
+
+// ConvertToHLS converts a video file to HLS segments.
+// If source bitrate <= 2 Mbps: uses -c copy (no re-encode, keeps original size).
+// If source bitrate > 2 Mbps: re-encodes down to 2 Mbps.
 func (h *HLSConverter) ConvertToHLS(videoPath string) error {
 	h.mu.Lock()
 	if h.converting[videoPath] {
@@ -115,46 +150,84 @@ func (h *HLSConverter) ConvertToHLS(videoPath string) error {
 	playlist := filepath.Join(hlsDir, "playlist.m3u8")
 	segmentPattern := filepath.Join(hlsDir, "seg_%05d.ts")
 
-	// Create HLS directory
 	if err := os.MkdirAll(hlsDir, 0755); err != nil {
 		return fmt.Errorf("failed to create HLS directory: %w", err)
 	}
 
-	log.Printf("[HLS] Converting: %s (re-encode with forced keyframes for fast playback)", filepath.Base(videoPath))
+	// Probe source bitrate to decide encode strategy
+	bitrate, err := probeBitrate(videoPath)
+	if err != nil {
+		log.Printf("[HLS] Could not probe bitrate for %s: %v — defaulting to copy", filepath.Base(videoPath), err)
+	}
+
 	start := time.Now()
 
-	// Re-encode with forced keyframes every 2 seconds
-	// This ensures each HLS segment is small (~1-2MB) for instant playback
-	// -c copy created 30-40MB segments (unusable over internet)
-	cmd := exec.Command("ffmpeg",
-		"-i", videoPath,
-		"-c:v", "libx264",
-		"-preset", "fast",
-		"-b:v", "2000k", // 2 Mbps video bitrate
-		"-maxrate", "2500k",
-		"-bufsize", "4000k",
-		"-g", "48", // Keyframe every 48 frames (2 seconds at 24fps)
-		"-keyint_min", "48",
-		"-c:a", "aac",
-		"-b:a", "128k",
-		"-hls_time", "4", // 4 second segments (~1MB each)
-		"-hls_list_size", "0", // Keep all segments in playlist
+	hlsArgs := []string{
+		"-hls_time", "4",
+		"-hls_list_size", "0",
 		"-hls_segment_filename", segmentPattern,
 		"-f", "hls",
 		"-y",
 		playlist,
-	)
+	}
+
+	var cmd *exec.Cmd
+	if bitrate == 0 || bitrate <= maxBitrateBps {
+		// Bitrate thấp hoặc không đo được → thử copy trước
+		log.Printf("[HLS] %s bitrate=%d bps (<=2Mbps) → trying -c copy", filepath.Base(videoPath), bitrate)
+		args := append([]string{
+			"-fflags", "+genpts+igndts",
+			"-err_detect", "ignore_err",
+			"-i", videoPath,
+			"-c", "copy",
+		}, hlsArgs...)
+		cmd = exec.Command("ffmpeg", args...)
+	} else {
+		// Bitrate cao → re-encode xuống 2 Mbps
+		log.Printf("[HLS] %s bitrate=%d bps (>2Mbps) → re-encoding to 2Mbps", filepath.Base(videoPath), bitrate)
+		args := append([]string{
+			"-fflags", "+genpts+igndts",
+			"-err_detect", "ignore_err",
+			"-i", videoPath,
+			"-c:v", "libx264", "-preset", "fast",
+			"-b:v", "2000k", "-maxrate", "2500k", "-bufsize", "4000k",
+			"-g", "48", "-keyint_min", "48",
+			"-c:a", "aac", "-b:a", "128k",
+		}, hlsArgs...)
+		cmd = exec.Command("ffmpeg", args...)
+	}
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// Cleanup on failure
-		os.RemoveAll(hlsDir)
-		log.Printf("[HLS] Failed to convert %s: %v\nOutput: %s", filepath.Base(videoPath), err, string(output))
-		return fmt.Errorf("ffmpeg failed: %w", err)
+		// Nếu -c copy lỗi (thường do file corrupt) → fallback sang re-encode
+		if bitrate == 0 || bitrate <= maxBitrateBps {
+			log.Printf("[HLS] -c copy failed for %s (possibly corrupt), retrying with re-encode", filepath.Base(videoPath))
+			os.RemoveAll(hlsDir)
+			if err2 := os.MkdirAll(hlsDir, 0755); err2 != nil {
+				return fmt.Errorf("failed to recreate HLS directory: %w", err2)
+			}
+			args := append([]string{
+				"-fflags", "+genpts+igndts",
+				"-err_detect", "ignore_err",
+				"-i", videoPath,
+				"-c:v", "libx264", "-preset", "fast",
+				"-b:v", "2000k", "-maxrate", "2500k", "-bufsize", "4000k",
+				"-g", "48", "-keyint_min", "48",
+				"-c:a", "aac", "-b:a", "128k",
+			}, hlsArgs...)
+			cmd2 := exec.Command("ffmpeg", args...)
+			output, err = cmd2.CombinedOutput()
+		}
+		if err != nil {
+			os.RemoveAll(hlsDir)
+			log.Printf("[HLS] Failed to convert %s: %v\nOutput: %s", filepath.Base(videoPath), err, string(output))
+			return fmt.Errorf("ffmpeg failed: %w", err)
+		}
+		log.Printf("[HLS] Re-encode fallback succeeded for %s", filepath.Base(videoPath))
 	}
 
 	elapsed := time.Since(start)
-	log.Printf("[HLS] Converted: %s in %v", filepath.Base(videoPath), elapsed)
+	log.Printf("[HLS] Done: %s in %v", filepath.Base(videoPath), elapsed)
 	return nil
 }
 

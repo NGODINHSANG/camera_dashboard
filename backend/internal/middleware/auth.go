@@ -72,3 +72,8 @@ func GetUserFromContext(ctx context.Context) *jwt.Claims {
 	}
 	return claims
 }
+
+// GetClaims là shorthand lấy claims từ request
+func GetClaims(r *http.Request) *jwt.Claims {
+	return GetUserFromContext(r.Context())
+}

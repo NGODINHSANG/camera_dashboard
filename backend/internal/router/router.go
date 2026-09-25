@@ -28,18 +28,29 @@ func Setup(db *sqlx.DB, cfg *config.Config) *chi.Mux {
 	userRepo := repository.NewUserRepository(db)
 	projectRepo := repository.NewProjectRepository(db)
 	cameraRepo := repository.NewCameraRepository(db)
+	permRepo := repository.NewProjectPermissionRepository(db)
+	chatRepo := repository.NewChatRepository(db)
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo, cfg.JWTSecret)
 	recorderService := services.NewRecorderService(db)
 
+	// Initialize video processor for uploads
+	videoProcessor := services.NewVideoProcessor(db, cfg.RecordingsPath)
+
+	// Start chat hub
+	go services.GlobalChatHub.Run()
+
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(authService)
+	authHandler := handlers.NewAuthHandler(authService, permRepo)
 	projectHandler := handlers.NewProjectHandler(projectRepo, cameraRepo)
-	cameraHandler := handlers.NewCameraHandler(cameraRepo, projectRepo)
-	adminHandler := handlers.NewAdminHandler(userRepo, projectRepo, cameraRepo)
+	cameraHandler := handlers.NewCameraHandler(cameraRepo, projectRepo, permRepo)
+	adminHandler := handlers.NewAdminHandler(userRepo, projectRepo, cameraRepo, permRepo)
 	recordingHandler := handlers.NewRecordingHandler(db, recorderService, cfg.RecordingsPath)
 	webhookHandler := handlers.NewWebhookHandler(db, recorderService, cfg.RecordingsPath)
+	uploadHandler := handlers.NewUploadHandler(db, cameraRepo, projectRepo, permRepo, videoProcessor)
+	chunkUploadHandler := handlers.NewChunkUploadHandler(db, cameraRepo, projectRepo, permRepo, videoProcessor)
+	chatHandler := handlers.NewChatHandler(chatRepo, cfg.RecordingsPath, services.GlobalChatHub, cfg.JWTSecret)
 
 	// Wire up auto-record callbacks
 	cameraHandler.SetAutoRecordCallback(webhookHandler.TriggerAutoRecordForCamera)
@@ -79,6 +90,10 @@ func Setup(db *sqlx.DB, cfg *config.Config) *chi.Mux {
 		r.Get("/recordings/hls", recordingHandler.ServeHLSFile)
 		r.Get("/recordings/restream", recordingHandler.LiveRestream)
 
+		// Chat WebSocket — must be outside AuthMiddleware; ServeWS authenticates via query param token
+		r.Get("/chat/ws", chatHandler.ServeWS)
+		r.Get("/chat/attachments/{filename}", chatHandler.ServeAttachment)
+
 		// Auth routes (public)
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/register", authHandler.Register)
@@ -109,6 +124,23 @@ func Setup(db *sqlx.DB, cfg *config.Config) *chi.Mux {
 					r.Post("/", cameraHandler.Create)
 					r.Put("/{cameraId}", cameraHandler.Update)
 					r.Delete("/{cameraId}", cameraHandler.Delete)
+
+					// Upload video to camera (global admin or project admin)
+					r.Post("/{cameraId}/upload", uploadHandler.Upload)
+					r.Get("/{cameraId}/upload-jobs", uploadHandler.GetCameraJobs)
+				})
+
+				// Upload job status
+				r.Get("/upload-jobs/{jobId}", uploadHandler.GetJobStatus)
+				r.Delete("/upload-jobs/{jobId}", uploadHandler.CancelJob)
+
+				// Chunked upload routes (global admin or project admin)
+				r.Route("/chunked-upload", func(r chi.Router) {
+					r.Post("/init/{projectId}/{cameraId}", chunkUploadHandler.InitUpload)
+					r.Post("/chunk/{uploadId}", chunkUploadHandler.UploadChunk)
+					r.Post("/complete/{uploadId}", chunkUploadHandler.CompleteUpload)
+					r.Get("/status/{uploadId}", chunkUploadHandler.GetUploadStatus)
+					r.Delete("/cancel/{uploadId}", chunkUploadHandler.CancelUpload)
 				})
 			})
 
@@ -134,6 +166,21 @@ func Setup(db *sqlx.DB, cfg *config.Config) *chi.Mux {
 				r.Delete("/files/delete", recordingHandler.DeleteVideoFile)
 			})
 
+			// Chat routes
+			r.Route("/chat", func(r chi.Router) {
+				r.Get("/online", chatHandler.GetOnlineUsers)
+				r.Get("/users/search", chatHandler.SearchUsers)
+				r.Get("/conversations", chatHandler.GetConversations)
+				r.Post("/conversations", chatHandler.CreateConversation)
+				r.Put("/conversations/{id}/name", chatHandler.RenameGroup)
+				r.Post("/conversations/{id}/members/{userId}", chatHandler.AddMember)
+				r.Delete("/conversations/{id}/members/{userId}", chatHandler.RemoveMember)
+				r.Get("/conversations/{id}/messages", chatHandler.GetMessages)
+				r.Post("/conversations/{id}/messages", chatHandler.SendMessage)
+				r.Post("/conversations/{id}/attachments", chatHandler.UploadAttachment)
+				r.Post("/conversations/{id}/read", chatHandler.MarkRead)
+			})
+
 			// Admin routes
 			r.Route("/admin", func(r chi.Router) {
 				r.Use(middleware.AdminOnlyMiddleware)
@@ -142,7 +189,13 @@ func Setup(db *sqlx.DB, cfg *config.Config) *chi.Mux {
 				r.Get("/users/{id}", adminHandler.GetUser)
 				r.Delete("/users/{id}", adminHandler.DeleteUser)
 				r.Put("/users/{id}/role", adminHandler.UpdateUserRole)
+				r.Get("/users/{id}/project-permissions", adminHandler.GetUserProjectPermissions)
 				r.Get("/projects", adminHandler.GetAllProjects)
+
+				// Project permission management
+				r.Get("/projects/{projectId}/members", adminHandler.GetProjectMembers)
+				r.Post("/projects/{projectId}/members/{userId}", adminHandler.GrantProjectPermission)
+				r.Delete("/projects/{projectId}/members/{userId}", adminHandler.RevokeProjectPermission)
 			})
 		})
 	})

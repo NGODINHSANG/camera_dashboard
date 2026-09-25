@@ -15,10 +15,15 @@ func Connect(dbPath string) (*sqlx.DB, error) {
 		return nil, err
 	}
 
-	db, err := sqlx.Connect("sqlite", dbPath+"?_foreign_keys=on")
+	db, err := sqlx.Connect("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=5000")
 	if err != nil {
 		return nil, err
 	}
+
+	// WAL mode allows concurrent reads while writing; busy_timeout waits instead of failing immediately
+	db.Exec("PRAGMA journal_mode=WAL")
+	db.Exec("PRAGMA busy_timeout=5000")
+	db.SetMaxOpenConns(1) // SQLite: serialize writes to avoid SQLITE_BUSY
 
 	// Run migrations
 	if err := RunMigrations(db); err != nil {

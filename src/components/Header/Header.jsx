@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import './Header.css'
-import batgroupLogo from '../../assets/batgroup.jpg'
+import batgroupLogo from '../../assets/logo_bat.png'
 
 function Header({ title, onlineCount, offlineCount, showBackButton, onBackClick, user, onLogout, isAdmin, onAddCamera, hasProject }) {
     const [currentTime, setCurrentTime] = useState(new Date())
@@ -96,11 +96,18 @@ function Header({ title, onlineCount, offlineCount, showBackButton, onBackClick,
                     <span className="date">{formatDate(currentTime)}</span>
                 </div>
                 {user && (
-                    <UserMenu
-                        user={user}
-                        isAdmin={isAdmin}
-                        onLogout={onLogout}
-                    />
+                    <>
+                        <Link to="/messages" className="chat-nav-btn" title="Tin nhắn">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M20 4H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V11h12v2zm0-3H6V8h12v2z"/>
+                            </svg>
+                        </Link>
+                        <UserMenu
+                            user={user}
+                            isAdmin={isAdmin}
+                            onLogout={onLogout}
+                        />
+                    </>
                 )}
             </div>
         </header>
